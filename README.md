@@ -87,7 +87,7 @@ Sample Grunt configuration:
 
     grunt.loadNpmTasks('grunt-contrib-sass');
     grunt.loadNpmTasks('grunt-contrib-watch');
-    grunt.loadTasks('../csspec-grunt');
+    grunt.loadNpmTasks('csspec-grunt');
 
 Note that SASS compilation is not currently bundled into the preprocessor and so needs to be run after the CSSpec preprocessing.
 
