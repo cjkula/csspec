@@ -69,9 +69,13 @@ function extractHAML(lines) {
 
 // process single (non-HAML) line
 function preprocessLine(line) {
-  var m = line.match(/^(\s*)(describe|when|it)\b(.*)$/i),
-      prefix, description, pair, selector = '';
+  var m, content, comment, prefix, description, pair, selectors, addSelectors = '';
 
+  m = line.match(/^(.*[^\s\/])(\s*\/\/.*)$/i);
+  content = m ? m[1] : line;
+  comment = m ? m[2] : '';
+
+  m = content.match(/^(\s*)(describe|when|it)\b(.*)$/i);
   if (!m) return line;
 
   indent = m[1];
@@ -79,16 +83,18 @@ function preprocessLine(line) {
   description = m[3].trim();
 
   if (prefix === 'when') {
-    if (pair = hashPair(description)) {
-      description = pair[0];
-      selector = pair[1];
-    } else if (isSelector(description)) {
-      selector = description;
-      description = paraphraseSelector(description);
+    if (pair = hashPair(description)) { // e.g. 'when description -> .class1.class2'
+      description = pair[0] + '-'; // trailing hyphen to associate with following selector
+      selectors = toSelectors(pair[1]);
+    } else if (selectors = toSelectors(description)) { // e.g. 'when #id'
+      description = '';
+    } else {
+      selectors = []; // else description only e.g. 'when previously viewed'
     }
+    addSelectors = selectors.join('.-when-');
   }
 
-  return indent + scopeClass(prefix, description) + selector;
+  return indent + scopeClass(prefix, description, !!indent) + addSelectors + comment;
 }
 
 // check for -> syntax and return array [firstObj, secondObj]
@@ -98,26 +104,15 @@ function hashPair(text) {
 }
 
 // boolean test
-function isSelector(description) {
-  return /^(\.|\#|\:)\S+$/.test(description);
+function toSelectors(description) {
+  return description.match(/(\.|\#|\:)[\w-_]+/g);
 }
 
 // turn space-delimited descriptor into SASS class defining test scope
-function scopeClass(prefix, description) {
-  return '&.-' + prefix + '-' + description.split(/\s+/).join('-');
-}
-
-// a descriptive scope name for when clauses that provide just a selector
-function paraphraseSelector(description) {
-  var m = description.match(/^([.#:])(\S+)$/);
-  switch (m && m[1]) {
-    case '.':
-      return 'has class ' + m[2];
-    case '#':
-      return 'has id ' + m[2];
-    default:
-      return null;
-  }
+function scopeClass(prefix, description, extendParent) {
+  return (extendParent ? '&' : '')
+          + '.-' + prefix 
+          + '-' + description.split(/\s+/).join('-');
 }
 
 module.exports = function(grunt) {

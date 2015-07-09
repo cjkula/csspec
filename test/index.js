@@ -8,7 +8,6 @@ var should         = require('chai').should(),
     preprocessFile = parser.preprocessFile;
 
 
-
 describe('#preprocess', function() {
   it('passes a simple class through unchanged', function() {
     preprocess(".testing").should.equal(".testing");
@@ -51,6 +50,7 @@ describe('#preprocess', function() {
       preprocess(".item\n\t$img =\n\t\t%img").should
           .equal(".item\n\t$img : '<img/>'");
     });
+    it('ports trailing comments into SASS');
   });
 });
 
@@ -65,6 +65,9 @@ describe('#preprocessLine', function() {
   it('converts grouping scopes', function() {
     preprocessLine("\tdescribe my element  ").should.equal("\t&.-describe-my-element");
   });
+  it('omits the parent selector & on root-level grouping scopes', function() {
+    preprocessLine("describe my root level element  ").should.equal(".-describe-my-root-level-element");
+  });
   it('converts test case scopes', function() {
     preprocessLine("  IT should have a NICE little hat\t\t").should.equal("  &.-it-should-have-a-NICE-little-hat");
   });
@@ -72,14 +75,30 @@ describe('#preprocessLine', function() {
     preprocessLine("\t\twhen it is featured").should.equal("\t\t&.-when-it-is-featured");
   });
   it('converts state scopes defined with an id', function() {
-    preprocessLine("\t\twhen #top").should.equal("\t\t&.-when-has-id-top#top");
+    preprocessLine("\t\twhen #top").should.equal("\t\t&.-when-#top");
   });
   it('converts state scopes defined with a class', function() {
-    preprocessLine("\t\twhen .active").should.equal("\t\t&.-when-has-class-active.active");
+    preprocessLine("\t\twhen .active").should.equal("\t\t&.-when-.active");
   });
-  it('converts state scopes defined with a class and a text description', function() {
-    preprocessLine("\t\twhen activated -> .active").should.equal("\t\t&.-when-activated.active");
+  it('converts state scopes defined with more than one class', function() {
+    preprocessLine("\t\twhen .active.top").should.equal("\t\t&.-when-.active.-when-.top");
   });
+  it('converts state scopes defined with a text description and a class', function() {
+    preprocessLine("\t\twhen activated -> .active").should.equal("\t\t&.-when-activated-.active");
+  });
+  it('converts state scopes defined with a text description and multiple classes', function() {
+    preprocessLine("\t\twhen activated -> .active.xx").should.equal("\t\t&.-when-activated-.active.-when-.xx");
+  });
+  it('maintains trailing whitespace and comments', function() {
+    preprocessLine(".testing\t// c ").should.equal(".testing\t// c ");
+    preprocessLine("\tdescribe my element  // c").should.equal("\t&.-describe-my-element  // c");
+    preprocessLine("  it must\t\t// c\t").should.equal("  &.-it-must\t\t// c\t");
+    preprocessLine("\twhen featured//c").should.equal("\t&.-when-featured//c");
+    preprocessLine("\twhen #bottom //\tc\t").should.equal("\t&.-when-#bottom //\tc\t");
+    preprocessLine("\twhen .stop ///").should.equal("\t&.-when-.stop ///");
+    preprocessLine("\twhen go -> .go-cls // comment").should.equal("\t&.-when-go-.go-cls // comment");
+  });
+  it('works around scope declaration trailing comment issue'); // SASS errors when a scope line ending with a comment is followed by a property declaration
 });
 
 describe('hamljs', function() {
