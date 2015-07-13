@@ -2,10 +2,8 @@ var fs = require('fs'),
     HAML = require('hamljs');
 
 // TO DO: rewrite using async file access
-function preprocessFile(source, dest) {
-  var sourcePath = process.cwd() + '/' + source,
-      destPath   = process.cwd() + '/' + dest,
-      input;
+function preprocessFile(sourcePath, destPath) {
+  var input;
 
   if (fs.existsSync(sourcePath)) {
     input = fs.readFileSync(sourcePath, { encoding: 'utf8' });
@@ -115,17 +113,18 @@ function scopeClass(prefix, description, extendParent) {
           + '-' + description.split(/\s+/).join('-');
 }
 
-module.exports = function(grunt) {
-  grunt.registerMultiTask('csspec', 'Preprocess CSSpec to SASS', function() {
-    var files = grunt.config('csspec').dev.files;
-    for(dest in files) {
-      preprocessFile(files[dest], dest);
-    }
-  });
+// expose public methods
+module.exports = {
+  preprocess: preprocess,
+  preprocessFile: preprocessFile
+};
 
-  this.preprocessFile = preprocessFile;
-  this.preprocess = preprocess;
-  this.preprocessLine = preprocessLine;
+// expose private methods for unit tests
+if (process.env.NODE_ENV === 'test') {
+  module.exports._private = {
+    preprocessLine: preprocessLine
+  }
 }
+
 
 

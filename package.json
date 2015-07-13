@@ -1,17 +1,16 @@
 {
-  "name": "csspec-grunt",
-  "version": "0.1.1",
-  "description": "Grunt preprocessor for CCSpec test suites",
+  "name": "csspec",
+  "version": "0.1.0",
+  "description": "CCSpec preprocessor and test runner",
   "main": "index.js",
   "scripts": {
     "test": "make test"
   },
   "repository": {
     "type": "git",
-    "url": "git://github.com/cjkula/csspec-grunt.git"
+    "url": "git://github.com/cjkula/csspec.git"
   },
   "keywords": [
-    "grunt",
     "csspec",
     "css",
     "sass",
@@ -25,12 +24,19 @@
   ],
   "author": "Christopher Kula <cjkula@gmail.com>",
   "license": "MIT",
-  "devDependencies": {
-    "chai": "^3.0.0",
-    "mocha": "^2.2.5",
-    "simple-mock": "^0.3.1"
-  },
   "dependencies": {
     "hamljs": "^0.6.2"
+  },
+  "devDependencies": {
+    "bower": "^1.4.1",
+    "chai": "^3.0.0",
+    "gulp": "^3.9.0",
+    "gulp-add-src": "^0.2.0",
+    "gulp-concat": "^2.6.0",
+    "gulp-jshint": "^1.11.2",
+    "gulp-rename": "^1.2.2",
+    "gulp-uglify": "^1.2.0",
+    "mocha": "^2.2.5",
+    "simple-mock": "^0.3.1"
   }
 }

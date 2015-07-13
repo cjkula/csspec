@@ -42,52 +42,19 @@ This compiles to:
 Usage
 -----
 
-    npm install csspec-grunt --save-dev
+    npm install csspec --save-dev
 
-Sample Grunt configuration:
+Exposed methods: 
 
-    grunt.initConfig({
+`preprocess(csspec)` parses CSSpec into its SASS equivalent.
 
-      pkg: grunt.file.readJSON('package.json'),
+`preprocessFile(source, dest)` does the same for files with fully-qualified pathnames.
 
-      csspec: {
-        dev: {
-          files: {
-            'test-suite.sass' : 'test-suite.csspec'
-          }
-        }
-      },
+For Grunt-enabled package use:
 
-      sass: {
-        dev: {
-          ...
-          files: {
-            ...
-            'test-suite.css' : 'test-suite.sass'
-          }
-        }
-      },
+    npm install grunt-csspec --save-dev
 
-      watch: {
-        sass: {
-          files: [
-            'app/sass/{,*/}*.{scss,sass}'
-          ],
-          tasks: ['sass:dev']
-        },
-        csspec: {
-          files: [
-            'css-tests/*.csspec'
-          ],
-          tasks: ['csspec:dev', 'sass:dev']
-        }
-      }
-
-    });
-
-    grunt.loadNpmTasks('grunt-contrib-sass');
-    grunt.loadNpmTasks('grunt-contrib-watch');
-    grunt.loadNpmTasks('csspec-grunt');
+See that project's docs for Gruntfile configuration.
 
 Note that SASS compilation is not currently bundled into the preprocessor and so needs to be run after the CSSpec preprocessing.
 

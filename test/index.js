@@ -1,12 +1,13 @@
+process.env.NODE_ENV = 'test';
+
 var should         = require('chai').should(),
     simple         = require('simple-mock'),
-    parser         = new (require('../index'))({ registerMultiTask: simple.stub() }),
+    parser         = require('../index'),
     fs             = require('fs'),
     HAML           = require('hamljs'),
     preprocess     = parser.preprocess,
-    preprocessLine = parser.preprocessLine,
-    preprocessFile = parser.preprocessFile;
-
+    preprocessFile = parser.preprocessFile,
+    preprocessLine = parser._private.preprocessLine;
 
 describe('#preprocess', function() {
   it('passes a simple class through unchanged', function() {
@@ -116,8 +117,8 @@ describe('#preprocessFile', function() {
 
     preprocessFile('source', 'dest');
 
-    read.lastCall.args[0].should.match(/\/source$/);
-    write.lastCall.args[0].should.match(/\/dest$/);
+    read.lastCall.args[0].should.equal('source');
+    write.lastCall.args[0].should.equal('dest');
     write.lastCall.args[1].should.equal('.csspec');
 
     simple.restore();
