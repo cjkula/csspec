@@ -26,7 +26,7 @@ For Grunt-enabled package use:
 
 See that project's docs for Gruntfile configuration.
 
-Note that SASS compilation is not currently bundled into the preprocessor and so needs to be run after the CSSpec preprocessing.
+Note that SASS compilation is not currently bundled into the package and so should be automated to run following CSSpec preprocessing.
 
 Syntax
 ------
@@ -66,6 +66,12 @@ Vision
 CSSpec leverages existing SASS/CSS (plus a dash of HAML) tools to deliver a browser-parseable test suite built on the same structural abstractions as CSS -- because it is coded in CSS itself. By adopting CSS as the abstract test framework, CSSpec also aims to provide a tool that is understandable and useable by those who already work comfortably in that language.
 
 By bringing coded specifications and automated regression testing to stylesheet development workflow, modularity and refactoring becomes more practical and achievable, and at the same time opens up the possibility that styling issues can be managed primarily in the style layer, freeing up HTML to be a cleaner semantic representation of underlying content.
+
+But Who Will Test the Testers
+-----------------------------
+
+Test-runner tests: `npm test`
+Compiler tests: `npm run compiler-test`
 
 License
 -------
