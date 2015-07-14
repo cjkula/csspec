@@ -3,14 +3,14 @@
 window.CSSpec = window.CSSpec || {};
 
 (function($, _) {
-  var module = CSSpec;
+  var def = CSSpec;
 
   CSSpec.testCase = function(ruleSelector, cssRule) {
     this.clauses = ruleSelector.split(/\s+/);
     this.cssRule = cssRule;
   };
 
-  module.testCase.prototype = {
+  def.testCase.prototype = {
 
     exec: function() {
       var self = this,
@@ -40,7 +40,7 @@ window.CSSpec = window.CSSpec || {};
 
     prepareTarget: function() {
       var self = this,
-          $el = module.$fixture;
+          $el = def.$fixture;
 
       this.rollbackStack = [];  // hooks to undo DOM changes
 
@@ -83,7 +83,7 @@ window.CSSpec = window.CSSpec || {};
       var self = this,
           $el = $input,
           filters = [], 
-          groups = [],
+          contexts = [],
           firstFlush = true,
           type,
           force = null;
@@ -92,8 +92,8 @@ window.CSSpec = window.CSSpec || {};
         // At the start of EVERY CLAUSE, the first selector
         // will select inside the containing $input element/
         // The one exception is for the first clause only:
-        // if there are only group selectors to be applied and
-        // NOTHING has yet been applied, then the group
+        // if there are only context selectors to be applied and
+        // NOTHING has yet been applied, then the context
         // selectors are applied TO the containing element.
 
         if (filters.length > 0) {
@@ -105,29 +105,29 @@ window.CSSpec = window.CSSpec || {};
         }
 
         if (filters.length > 0) {
-          self.applySelectors(groups, $el);
+          self.applySelectors(contexts, $el);
         } else if (firstFlush && clauseIndex > 0) {
-            $el = $el.find(groups.join(''));
+            $el = $el.find(contexts.join(''));
         } else {
-          self.applySelectors(groups, $el);
+          self.applySelectors(contexts, $el);
         }
 
         filters = [];
-        groups = [];
+        contexts = [];
         firstFlush = false;
       }
 
       _.each(this.splitSelectors(clause), function(selector, selectorIndex) {
 
-        type = force || module.selectorType(selector);
+        type = force || def.selectorType(selector);
         force = null;
 
         switch(type) {
           case 'selector':
             filters.push(selector);
             break;
-          case 'group':
-            groups.push(selector);
+          case 'context':
+            contexts.push(selector);
             break;
           case 'state-':
             force = 'afterHyphen'; // trigger afterState case on next selector
@@ -137,8 +137,8 @@ window.CSSpec = window.CSSpec || {};
             flushQueues();
             self.applySelector(selector, $el);
             break;
-          case 'requirement':
-            self.requirement = selector;
+          case 'test':
+            self.test = selector;
         }
 
       });
@@ -232,7 +232,7 @@ window.CSSpec = window.CSSpec || {};
       _.each(this.clauses, function(clause) {
 
         var selectors = self.splitSelectors(clause),
-            types = _.map(selectors, module.selectorType);
+            types = _.map(selectors, def.selectorType);
 
         _.each(self.splitSelectors(clause), function(selector, i) {
           if (types[i] === 'selector') {
@@ -245,7 +245,7 @@ window.CSSpec = window.CSSpec || {};
               }
             }
           } else {
-            sections.push(module.testClassToNaturalLanguage(selector, types[i] !== 'state-'));
+            sections.push(def.testClassToNaturalLanguage(selector, types[i] !== 'state-'));
           }
 
         });

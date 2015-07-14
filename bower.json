@@ -1,0 +1,11 @@
+{
+  "name": "csspec",
+  "description": "CCSpec recompiler and test runner",
+  "version": "0.1.0",
+  "homepage": "https://github.com/angular/angular-seed",
+  "license": "MIT",
+  "dependencies": {
+    "jquery": "^2.1.4",
+    "underscore": "^1.8.3"
+  }
+}

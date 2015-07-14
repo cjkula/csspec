@@ -2,7 +2,7 @@ process.env.NODE_ENV = 'test';
 
 var should         = require('chai').should(),
     simple         = require('simple-mock'),
-    parser         = require('../index'),
+    parser         = require('../../index'),
     fs             = require('fs'),
     HAML           = require('hamljs'),
     preprocess     = parser.preprocess,

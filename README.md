@@ -1,5 +1,5 @@
-CSSpec-Grunt
-============
+CSSpec
+======
 
 CSSpec is a supersyntax of SASS which compiles to SASS/CSS and implements nested descriptions and test cases for CSS client-side unit and integration tests. CSSpec is syntatic sugar and all features of CSSpec test runners can coded in SASS, SCSS, or CSS directly.
 

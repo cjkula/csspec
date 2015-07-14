@@ -4,29 +4,29 @@ window.CSSpec = window.CSSpec || {};
 
 (function($, _) {
 
-  var module = CSSpec;
+  var def = CSSpec;
 
   // On DOM ready, do it all
   $(function() {
-    module.prepare();
-    module.exec(module.fixtureSelector);
-    module.report();
+    def.prepare();
+    def.exec(def.fixtureSelector);
+    def.report();
   });
 
-  _.extend(module, {
+  _.extend(def, {
 
     fixtureSelector: '#csspec-fixture',
 
     selectorType: function(selector) {
-      if (/^\.-describe/.test(selector)) return 'group';
+      if (/^\.-describe/.test(selector)) return 'context';
       if (/^\.-when.*-$/.test(selector)) return 'state-';
       if (/^\.-when/.test(selector)) return 'state';
-      if (/^\.-it/.test(selector)) return 'requirement'; 
+      if (/^\.-it/.test(selector)) return 'test'; 
       return 'selector';   
     },
 
     testClassToNaturalLanguage: function(testClass, omitType) {
-      if (module.selectorType(testClass) === 'selector') return null;
+      if (def.selectorType(testClass) === 'selector') return null;
       return _.rest(testClass.split('-'), omitType ? 2 : 1).join(' ').trim();
     },
 
@@ -50,16 +50,16 @@ window.CSSpec = window.CSSpec || {};
 
     ruleTestCases: function(cssRule) {
       return _.chain(cssRule.selectorText.split(/,\s*/))
-              .filter(module.hasRequirement)
-              .map(function(selector) { return new module.testCase(selector, cssRule); })
+              .filter(def.hasRequirement)
+              .map(function(selector) { return new def.testCase(selector, cssRule); })
               .value();
     },
 
     prepare: function() {
-      module.testCases = _.chain(document.styleSheets)
+      def.testCases = _.chain(document.styleSheets)
                           .pluck('cssRules')
                           .map(_.toArray).flatten()
-                          .map(module.ruleTestCases)
+                          .map(def.ruleTestCases)
                           .flatten().value();
     },
 
@@ -70,13 +70,13 @@ window.CSSpec = window.CSSpec || {};
     },
 
     exec: function(fixtureEl) {
-      module.$fixture = $(fixtureEl);
-      _.invoke(module.testCases, 'exec');
+      def.$fixture = $(fixtureEl);
+      _.invoke(def.testCases, 'exec');
     },
 
     report: function() {
 
-      var results   = _.pluck(module.testCases, 'result'),
+      var results   = _.pluck(def.testCases, 'result'),
           counts    = { pass: 0, fail: 0, pending: 0, inapplicable: 0 },
           dotReport = _.map(results, function(result) {
                         switch(result) {
@@ -98,7 +98,7 @@ window.CSSpec = window.CSSpec || {};
                   counts.pending      + ' PENDING');
       console.log('');
 
-      _.chain(module.testCases)
+      _.chain(def.testCases)
        .filter(function(testCase) { return testCase.result === 'fail'; })
        .invoke('report');
 
