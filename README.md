@@ -1,43 +1,13 @@
 CSSpec
 ======
 
+Note this is a pre-v1.0.0 WIP!
+
 CSSpec is a supersyntax of SASS which compiles to SASS/CSS and implements nested descriptions and test cases for CSS client-side unit and integration tests. CSSpec is syntatic sugar and all features of CSSpec test runners can coded in SASS, SCSS, or CSS directly.
 
 To populate client-side test fixtures, HAML templates can be included inline or assigned to SASS variables.
 
 This current preprocessor implementation is intended for development-build, server-side use in a NodeJS/Grunt project.
-
-Syntax
-------
-
-Define what element(s) you are querying with SASS nested structure. Group tests with `describe`, and group expectations with `it ...`. Force the application or removal of classes, ids, and psuedo-states with `when`. Create fixture markup with a line-terminating equal sign followed by HAML (which can also include inline HTML).
-
-    #csspec-fixture
-      content =
-        .feature test
-
-    describe my feature
-      .feature
-        when not activated
-          it should not be displayed by default
-            display: none
-        when activated -> .active
-          it should be displayed
-            display: block
-
-This compiles to:
-
-    #csspec-fixture
-      content: '<div class"feature">test</div>'
-
-    &.-describe-my-feature
-      .feature
-        &.-when-not-activated
-          &.-it-should-not-be-displayed
-            display: none
-        &.-when-activated.active
-          &.-it-should-be-displayed
-            display: block
 
 Usage
 -----
@@ -58,12 +28,42 @@ See that project's docs for Gruntfile configuration.
 
 Note that SASS compilation is not currently bundled into the preprocessor and so needs to be run after the CSSpec preprocessing.
 
+Syntax
+------
+
+Define what element(s) you are querying with SASS nested structure. Group tests with `describe`, and group expectations with `it ...`. Force the application or removal of classes, ids, and psuedo-states with `when`. Create fixture markup with a line-terminating equal sign followed by HAML (which can also include inline HTML).
+
+    $fixture =
+      .feature test
+
+    describe my feature
+      content: $fixture
+      .feature
+        describe by default
+          it should not be displayed
+            display: none
+        when activated -> .active
+          it should be displayed
+            display: block
+
+This compiles to:
+
+    $fixture = '<div class"feature">test</div>'
+    
+    &.-describe-my-feature
+      content: $fixture
+      .feature
+        &.-describe-by-default
+          &.-it-should-not-be-displayed
+            display: none
+        &.-when-activated-.active
+          &.-it-should-be-displayed
+            display: block
+
 License
 -------
 
 The MIT License (MIT)
-
-Copyright (c) 2015 Christopher Kula
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
