@@ -13,8 +13,7 @@ window.CSSpec = window.CSSpec || {};
   def.TestCase.prototype = {
 
     exec: function() {
-      var self = this,
-          expectedAttrs = this.cssRule.style,
+      var expectedAttrs = this.cssRule.style,
           $target = this.prepareTarget();
 
       this.failures = [];
@@ -22,12 +21,12 @@ window.CSSpec = window.CSSpec || {};
       this.targetCount = $target.length;
 
       if (this.targetCount > 0) {
-      
+
+        this.result = 'pass';
+
         _.each(expectedAttrs, _.bind(function(attrName) {
-          var evaluation = self.evaluateCriterion($target, attrName, expectedAttrs[attrName]);
-          if (evaluation.result === 'fail') {
-            self.result = 'fail';
-            self.failures.push(evaluation.report);
+          if (!this.meetsExpectation($target, attrName, expectedAttrs[attrName])) {
+            this.result = 'fail';
           }
         }, this));
 
@@ -201,15 +200,15 @@ window.CSSpec = window.CSSpec || {};
       }
     },
 
-    evaluateCriterion: function($target, attrName, expectedValue) {
+    meetsExpectation: function($target, attrName, expectedValue) {
       var actual = this.resolveAttribute($target, attrName);
-      if (actual === expectedValue) return { result: 'pass' };
-      return {
-        result: 'fail',
-        report: 'expected :' + attrName + 
-                ' to be ' + expectedValue +
-                ' but was ' + actual + '.'
-      };
+
+      if (actual === expectedValue) return true;
+
+      this.failures.push('expected :' + attrName + 
+                         ' to be ' + expectedValue +
+                         ' but was ' + actual + '.');
+      return false;
     },
 
     resolveAttribute: function($target, attrName) {
