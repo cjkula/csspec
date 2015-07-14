@@ -1,13 +1,13 @@
 CSSpec
 ======
 
-Note this is a pre-v1.0.0 WIP!
+This is a pre-release WIP. 
 
-CSSpec is a supersyntax of SASS which compiles to SASS/CSS and implements nested descriptions and test cases for CSS client-side unit and integration tests. CSSpec is syntatic sugar and all features of CSSpec test runners can coded in SASS, SCSS, or CSS directly.
+CSSpec is a supersyntax of SASS which compiles to SASS/CSS and implements nested descriptions and test cases for CSS client-side unit and integration tests. CSSpec is syntactic sugar and all features of CSSpec test runners are codeable directly in SASS, SCSS, or CSS.
 
-To populate client-side test fixtures, HAML templates can be included inline or assigned to SASS variables.
+HAML can be used inline to generate client-side markup and can also be assigned to SASS variables.
 
-This current preprocessor implementation is intended for development-build, server-side use in a NodeJS/Grunt project.
+See https://github.com/cjkula/csspec-angular for a sample integration into an AngularJS application.
 
 Usage
 -----
@@ -59,6 +59,13 @@ This compiles to:
         &.-when-activated-.active
           &.-it-should-be-displayed
             display: block
+
+Vision
+------
+
+CSSpec leverages existing SASS/CSS (plus a dash of HAML) tools to deliver a browser-parseable test suite built on the same structural abstractions as CSS -- because it is coded in CSS itself. By adopting CSS as the abstract test framework, CSSpec also aims to provide a tool that is understandable and useable by those who already work comfortably in that language.
+
+By bringing coded specifications and automated regression testing to stylesheet development workflow, modularity and refactoring becomes more practical and achievable, and at the same time opens up the possibility that styling issues can be managed primarily in the style layer, freeing up HTML to be a cleaner semantic representation of underlying content.
 
 License
 -------
