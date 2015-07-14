@@ -5,12 +5,12 @@ window.CSSpec = window.CSSpec || {};
 (function($, _) {
   var def = CSSpec;
 
-  CSSpec.testCase = function(ruleSelector, cssRule) {
+  CSSpec.TestCase = function(ruleSelector, cssRule) {
     this.clauses = ruleSelector.split(/\s+/);
     this.cssRule = cssRule;
   };
 
-  def.testCase.prototype = {
+  def.TestCase.prototype = {
 
     exec: function() {
       var self = this,
@@ -129,7 +129,7 @@ window.CSSpec = window.CSSpec || {};
           case 'context':
             contexts.push(selector);
             break;
-          case 'state-':
+          case 'stateSelector':
             force = 'afterHyphen'; // trigger afterState case on next selector
             // break intentionally omitted
           case 'state':
@@ -236,8 +236,8 @@ window.CSSpec = window.CSSpec || {};
 
         _.each(self.splitSelectors(clause), function(selector, i) {
           if (types[i] === 'selector') {
-            if ((i > 0) && (types[i - 1] === 'state-')) {
-              if ((i > 2) && (types[i - 2] === 'selector') && (types[i - 3] === 'state-')) {
+            if ((i > 0) && (types[i - 1] === 'stateSelector')) {
+              if ((i > 2) && (types[i - 2] === 'selector') && (types[i - 3] === 'stateSelector')) {
                 sections.pop();
                 sections[sections.length - 1] = sections[sections.length - 1] + selector;
               } else {
@@ -245,7 +245,7 @@ window.CSSpec = window.CSSpec || {};
               }
             }
           } else {
-            sections.push(def.testClassToNaturalLanguage(selector, types[i] !== 'state-'));
+            sections.push(def.csspecSelectorToNaturalLanguage(selector, types[i] !== 'stateSelector'));
           }
 
         });
