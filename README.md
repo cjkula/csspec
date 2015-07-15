@@ -47,10 +47,10 @@ Define what element(s) you are querying with SASS nested structure. Group tests 
             display: block
 
 This compiles to:
-
-    $fixture = '<div class"feature">test</div>'
     
-    &.-describe-my-feature
+    $fixture : '<div class="feature">test</div>'
+
+    .-describe-my-feature
       content: $fixture
       .feature
         &.-describe-by-default
@@ -60,12 +60,33 @@ This compiles to:
           &.-it-should-be-displayed
             display: block
 
+The resulting two tests, "my feature by default should not be displayed" and "my feature when activated should be displayed", are tested comparing the actual DOM element properties to the expectations defined inside each -it- clause.
+
 Vision
 ------
 
 CSSpec leverages existing SASS/CSS (plus a dash of HAML) tools to deliver a browser-parseable test suite built on the same structural abstractions as CSS -- because it is coded in CSS itself. By adopting CSS as the abstract test framework, CSSpec also aims to provide a tool that is understandable and useable by those who already work comfortably in that language.
 
 By bringing coded specifications and automated regression testing to stylesheet development workflow, modularity and refactoring becomes more practical and achievable, and at the same time opens up the possibility that styling issues can be managed primarily in the style layer, freeing up HTML to be a cleaner semantic representation of underlying content.
+
+The following mixin accepts as an argument a selector (could be a class, psuedo-class, or otherwise) which triggers the display of the element:
+
+    =show-active($active-sel)
+      display: none
+      &#{$active-sel}
+        display: block
+
+This CSSpec mixin corresponds to the above module, and can be invoked by integration tests in whatever context the mixin is used in an actual application:
+
+    =show-active-test($active-sel)
+      &#{$active-sel}
+        it should be shown
+          display: block
+      &:not(#{$active-sel})
+        it should be hidden
+          display: none
+
+More significantly, this pattern offers a level of abstraction for selectors of nested elements such as layouts, insets, etc., avoiding the need to saddle DOM elements with classes that couple them tightly to a given style implementation and require significant JavaScript manipulation. The addition of style regression testing makes it possible to employ SASS tools to safely decouple style from semantic structure.
 
 But Who Will Test the Testers
 -----------------------------
