@@ -88,11 +88,12 @@ This CSSpec mixin corresponds to the above module, and can be invoked by integra
 
 More significantly, this pattern offers a level of abstraction for selectors of nested elements such as layouts, insets, etc., avoiding the need to saddle DOM elements with classes that couple them tightly to a given style implementation and require significant JavaScript manipulation. The addition of style regression testing makes it possible to employ SASS tools to safely decouple style from semantic structure.
 
-But Who Will Test the Testers
------------------------------
+Who Tests the Testers?
+----------------------
 
-Test-runner tests: `npm test`
 Compiler tests: `npm run compiler-test`
+
+Browser test-runner tests: `npm test`
 
 License
 -------
