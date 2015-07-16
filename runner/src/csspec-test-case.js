@@ -5,6 +5,7 @@ window.CSSpec = window.CSSpec || {};
 (function($, _) {
   var def = CSSpec;
 
+  // constructor
   CSSpec.TestCase = function(ruleSelector, cssRule) {
     this.clauses = ruleSelector.split(/\s+/);
     this.cssRule = cssRule;
@@ -12,51 +13,59 @@ window.CSSpec = window.CSSpec || {};
 
   def.TestCase.prototype = {
 
+    // Evaluate test case if any expectations set (otherwise return 'pending').
     exec: function() {
-      var expectedAttrs = this.cssRule.style,
-          $target = this.prepareTarget();
-
+      var expectations = this.cssRule.style;
       this.failures = [];
-      this.result = expectedAttrs.length > 0 ? 'pass' : 'pending';
-      this.targetCount = $target.length;
-
-      if (this.targetCount > 0) {
-
-        this.result = 'pass';
-
-        _.each(expectedAttrs, _.bind(function(attrName) {
-          if (!this.meetsExpectation($target, attrName, expectedAttrs[attrName])) {
-            this.result = 'fail';
-          }
-        }, this));
-
-      } else {
-        this.result = 'inapplicable';
-      }
-
-      this.rollback();
+      this.result = expectations.length > 0 ? this.testTarget(expectations) : 'pending';
     },
 
-    prepareTarget: function() {
-      var self = this,
-          $el = def.$fixture;
+    // Apply selectors and fixure content to the selected element(s) and evaluate test case.
+    // Revert DOM state after completed.
+    testTarget: function(expectations) {
+      return this.revertAfter(function() {
 
-      this.rollbackStack = [];  // hooks to undo DOM changes
+        this.$target = this.applyClauses(def.$fixture);
 
-      _.each(this.clauses, function(clause, index) {
-
-        $el = self.applyClauseSelectors($el, clause, index); // add classes etc.
-        self.applyContent($el);   // insert content if part of
-                                  // resulting selector definition
+        return this.$target.length === 0 ? 'inapplicable' :
+               (this.targetMeetsExpectations(expectations) ? 'pass' : 'fail');
       });
+    },
+
+    // Filter and apply classes and content, clause by clause
+    applyClauses: function($el) {
+      _.each(this.clauses, _.bind(function(clause, index) {
+
+        // add classes etc.
+        $el = this.applyClauseSelectors($el, clause, index);
+
+        // insert content if in resulting selector definition
+        this.applyContent($el);
+
+      }, this));
 
       return $el;
     },
 
+    // Boolean: does this.$target pass the tests?
+    targetMeetsExpectations: function(expectations) {
+      var i, attrName, pass = true;
+
+      // keeping it local so can return on first failure if preferred
+      for (i = 0; i < expectations.length; i++) {
+        attrName = expectations[i];
+        if (!this.meetsExpectation(this.$target, attrName, expectations[attrName]))
+          pass = false;
+      }
+      return pass;
+    },
+
+    // Split a clause into component selectors.
     splitSelectors: function(clause) {
       return clause.match(/(\:not\()?[.#:]*[^.#:]+\)?/g);
     },
 
+    // Replace inner HTML of element with CSS :content if defined
     applyContent: function($el) {
       var content = $el.css('content'),
           saveContent;
@@ -66,55 +75,22 @@ window.CSSpec = window.CSSpec || {};
         content = content.match(/^\s*(\'(.*)\'|\"(.*)\")\s*$/)[2];
         saveContent = $el.html();
         if (content !== saveContent) {
-
           $el.html(content);
-
-          this.rollbackStack.push(function() {
-            $el.html(saveContent);
-          });
-
+          this.revert(function() { $el.html(saveContent); });
         }
       }
 
     },
 
+    // needs another refactor to make comprehensible
     applyClauseSelectors: function($input, clause, clauseIndex) {
       var self = this,
           $el = $input,
           filters = [], 
           contexts = [],
-          firstFlush = true,
+          firstApply = true,
           type,
           force = null;
-
-      function flushQueues() {
-        // At the start of EVERY CLAUSE, the first selector
-        // will select inside the containing $input element/
-        // The one exception is for the first clause only:
-        // if there are only context selectors to be applied and
-        // NOTHING has yet been applied, then the context
-        // selectors are applied TO the containing element.
-
-        if (filters.length > 0) {
-          if (firstFlush) {
-            $el = $el.find(filters.join(''));
-          } else {
-            $el = $el.filter(filters.join(''));
-          }
-        }
-
-        if (filters.length > 0) {
-          self.applySelectors(contexts, $el);
-        } else if (firstFlush && clauseIndex > 0) {
-            $el = $el.find(contexts.join(''));
-        } else {
-          self.applySelectors(contexts, $el);
-        }
-
-        filters = [];
-        contexts = [];
-        firstFlush = false;
-      }
 
       _.each(this.splitSelectors(clause), function(selector, selectorIndex) {
 
@@ -133,16 +109,34 @@ window.CSSpec = window.CSSpec || {};
             // break intentionally omitted
           case 'state':
           case 'afterHyphen':
-            flushQueues();
+            $el = self.applyQueues($el, filters, contexts, clauseIndex === 0, firstApply);
+            filters = [];
+            contexts = [];
+            firstApply = false;
             self.applySelector(selector, $el);
-            break;
-          case 'test':
-            self.test = selector;
         }
 
       });
 
-      flushQueues();
+      return this.applyQueues($el, filters, contexts, clauseIndex === 0, firstApply);
+    },
+
+    applyQueues: function($el, filters, contexts, firstClause, firstApply) {
+      // At the start of EVERY CLAUSE, the first selector
+      // will select inside the containing $input element/
+      // The one exception is for the first clause only:
+      // if there are only context selectors to be applied and
+      // NOTHING has yet been applied, then the context
+      // selectors are applied TO the containing element.
+
+      if (filters.length > 0) {
+        $el = $el[firstApply ? 'find' : 'filter'](filters.join(''));
+        this.applySelectors(contexts, $el);
+      } else if (firstApply && !firstClause) {
+        $el = $el.find(contexts.join(''));
+      } else {
+        this.applySelectors(contexts, $el);
+      }
 
       return $el;
     },
@@ -154,50 +148,61 @@ window.CSSpec = window.CSSpec || {};
     },
 
     applySelector: function(selector, $el) {
-      var matches = selector.match(/^(\.|#|\:not\(\.)(.+)\)?$/),
+      var matches = selector.match(/^(\.|#|\:not\(\.|\:not\(#)([^\)]+)\)?$/),
           prefix = matches[1],
-          identifier = matches[2],
-          saveIdentifier;
+          identifier = matches[2];
 
       switch (prefix) {
-
         case '.':
-          if (!$el.hasClass(identifier)) {
-            $el.addClass(identifier);
-            this.rollbackStack.push(function() {
-              $el.removeClass(identifier);
-            });
-          }
+          this.applyClass($el, identifier);
           break;
-
-        case '#':
-          saveIdentifier = $el.attr('id');
-          if (identifier !== saveIdentifier) {
-            $el.attr('id', identifier);
-            this.rollbackStack.push(function() {
-              $el.attr('id', saveIdentifier);
-            });
-          }
-          break;
-
         case ':not(.':
-          if ($el.hasClass(identifier)) {
-            $el.removeClass(identifier);
-            this.rollbackStack.push(function() {
-              $el.addClass(identifier);
-            });
-          }
+          this.applyClass($el, identifier, true);
           break;
-
+        case '#':
+          this.applyId($el, identifier);
+          break;
+        case ':not(#':
+          this.applyId($el, identifier, true);
+          break;
       }
 
     },
 
-    // undo applied states
-    rollback: function() {
-      while (this.rollbackStack && this.rollbackStack.length > 0) {
+    applyClass: function($el, cls, invert) {
+      var has = $el.hasClass(cls);
+      if (!has || (invert && has)) {
+        $el.toggleClass(cls, !invert);
+        this.revert(function() { $el.toggleClass(cls, invert); });
+      }
+    },
+
+    applyId: function($el, id, invert) {
+      var saveId = $el.attr('id');
+      if (id !== saveId || (invert && id === saveId)) {
+        $el.attr('id', invert ? '' : id);
+        this.revert(function() { $el.attr('id', saveId); });
+      }
+    },
+
+    // 
+    revert: function(undo) {
+      if (!this.rollbackStack) this.rollbackStack = [];
+      this.rollbackStack.push(undo);
+    },
+
+    // Establishes a rollback stack and calls each function pushed by the yielded action.
+    // Passes result of yield to invoking function.
+    revertAfter: function(execute) {
+      var result;
+      this.rollbackStack = [];
+
+      result = execute.call(this);
+
+      while (this.rollbackStack.length > 0) {
         this.rollbackStack.pop()();
       }
+      return result;
     },
 
     meetsExpectation: function($target, attrName, expectedValue) {
