@@ -510,17 +510,51 @@ describe('test case', function(){
   });
 
 
-  // not ready for prime time
   describe('#meetsExpectation', function() {
+    var testCase = instance('.example', {});
+    beforeEach(function() {
+      testCase.failures = [];
+      spyOn(testCase, 'resolveAttribute').and.returnValue('resolved value');
+    });
+    describe('when the resolved attribute equals the expectation', function() {
+      it('should return true', function() {
+        expect(testCase.meetsExpectation($('<div />'), 'dummy', 'resolved value')).toBe(true);
+      });
+      it('should not report a failure', function() {
+        testCase.meetsExpectation($('<div />'), 'dummy', 'resolved value');
+        expect(testCase.failures.length).toEqual(0);
+      });
+    });
+    describe('when the resolved attribute does not equal the expectation', function() {
+      it('should return false', function() {
+        expect(testCase.meetsExpectation($('<div />'), 'dummy', 'expected value')).toBe(false);
+      });
+      it('should report a failure', function() {
+        testCase.meetsExpectation($('<div />'), 'dummy', 'expected value');
+        expect(testCase.failures.length).toEqual(1);
+      });
+    });
   });
 
 
   // not ready for prime time
   describe('#resolveAttribute', function() {
+    var testCase = instance('.example', {}),
+        $el = $('<div />', {
+          css: {
+            position: 'fixed',
+            'margin-top' : '10px'
+          }
+        });
+    it('should return normal CSS attributes', function() {
+      expect(testCase.resolveAttribute($el, 'position')).toEqual('fixed');
+      expect(testCase.resolveAttribute($el, 'margin-top')).toEqual('10px');
+      expect(testCase.resolveAttribute($el, 'display')).toEqual('');
+    });
   });
 
 
-  // wait to test until karma integration
+  // wait to test until karma integration is begun
   describe('#report', function() {
   });
 
