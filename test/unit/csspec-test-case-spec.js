@@ -318,24 +318,50 @@ describe('test case', function(){
   });
 
 
-  // // Replace inner HTML of element with CSS :content if defined
-  // applyContent: function($el) {
-  //   var content = $el.css('content'),
-  //       saveContent;
-
-  //   if (content) {
-
-  //     content = content.match(/^\s*(\'(.*)\'|\"(.*)\")\s*$/)[2];
-  //     saveContent = $el.html();
-  //     if (content !== saveContent) {
-  //       $el.html(content);
-  //       this.revert(function() { $el.html(saveContent); });
-  //     }
-  //   }
-
-  // },
   describe('#applyContent', function() {
-
+    var testCase, $el;
+    beforeEach(function() {
+      testCase = instance('.example', {});
+      $el = $('<div class="element">ORIGINAL CONTENT</div>').appendTo('body');
+    });
+    afterEach(function() {
+      $el.remove();
+    });
+    function contentStyle(selector, content, callback) {
+      var $styleTag = $("<style> " + selector + ' { content: \'' + content + "'; } </style>");
+      $("head").append($styleTag);
+      callback();
+      $styleTag.remove();
+    }
+    it('should replace the content of an element with the :content', function() {
+      contentStyle('.element', 'NEW CONTENT', function() {
+        expect($el.html()).toEqual('ORIGINAL CONTENT');
+        testCase.applyContent($el);
+        expect($el.html()).toEqual('NEW CONTENT');
+      });
+    });
+    it('should not replace the content of an element if no :content attribute', function() {
+      testCase.applyContent($el);
+      expect($el.html()).toEqual('ORIGINAL CONTENT');
+    });
+    it('should push a revert method', function() {
+      contentStyle('.element', 'NEW CONTENT', function() {
+        testCase.rollbackStack = [];
+        testCase.applyContent($el);
+        expect($el.html()).toEqual('NEW CONTENT');
+        testCase.rollbackStack[0]();
+        expect($el.html()).toEqual('ORIGINAL CONTENT');        
+      });
+    });
+    it('should not change content or push a revert method if new content matches old', function() {
+      $el.html('SAME CONTENT');
+      contentStyle('.element', 'SAME CONTENT', function() {
+        testCase.rollbackStack = [];
+        testCase.applyContent($el);
+        expect($el.html()).toEqual('SAME CONTENT');   
+        expect(testCase.rollbackStack.length).toBe(0);     
+      });
+    });
   });
 
 
@@ -461,19 +487,6 @@ describe('test case', function(){
   });
 
 
-  // // Establishes a rollback stack and calls each function pushed by the yielded action.
-  // // Passes result of yield to invoking function.
-  // revertAfter: function(execute) {
-  //   var result;
-  //   this.rollbackStack = [];
-
-  //   result = execute.call(this);
-
-  //   while (this.rollbackStack.length > 0) {
-  //     this.rollbackStack.pop()();
-  //   }
-  //   return result;
-  // },
   describe('#revertAfter', function() {
     var testCase = instance('.example', {});
     it('should clear the rollback stack', function() {
@@ -542,14 +555,27 @@ describe('test case', function(){
     var testCase = instance('.example', {}),
         $el = $('<div />', {
           css: {
-            position: 'fixed',
-            'margin-top' : '10px'
+            position     : 'fixed',
+            'margin-top' : '10px',
+            'font-size'  : '20px'
           }
-        });
+        }),
+        $inner = $('<div id="inner" />');
+        $('body').append($el);
+        $($el).append($inner);
+    afterAll(function() {
+      $el.remove();
+    });
     it('should return normal CSS attributes', function() {
       expect(testCase.resolveAttribute($el, 'position')).toEqual('fixed');
       expect(testCase.resolveAttribute($el, 'margin-top')).toEqual('10px');
-      expect(testCase.resolveAttribute($el, 'display')).toEqual('');
+    });
+    it('should return default CSS attributes', function() {
+      expect(testCase.resolveAttribute($el, 'display')).toEqual('block');
+      expect(testCase.resolveAttribute($inner, 'position')).toEqual('static');
+    });
+    it('should return inherited CSS attributes', function() {
+      expect(testCase.resolveAttribute($inner, 'font-size')).toEqual('20px');
     });
   });
 

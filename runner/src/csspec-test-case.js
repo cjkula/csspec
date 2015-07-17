@@ -212,8 +212,10 @@ window.CSSpec = window.CSSpec || {};
     },
 
     resolveAttribute: function($target, attrName) {
-      return $target.css(attrName);
+      var value = $target.css(attrName);
+      return value || window.getComputedStyle($target.get(0))[attrName];
     },
+
 
     report: function() {
       var label = this.result === 'pass' ? 'SUCCESS' : (this.result === 'fail' ? 'FAILURE' : 'PENDING');
