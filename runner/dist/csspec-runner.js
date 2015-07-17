@@ -10820,11 +10820,6 @@ window.CSSpec = window.CSSpec || {};
       return pass;
     },
 
-    // Split a clause into component selectors.
-    splitSelectors: function(clause) {
-      return clause.match(/(\:not\()?[.#:]*[^.#:]+\)?/g);
-    },
-
     // Replace inner HTML of element with CSS :content if defined
     applyContent: function($el) {
       var content = $el.css('content'),
@@ -10852,7 +10847,7 @@ window.CSSpec = window.CSSpec || {};
           type,
           force = null;
 
-      _.each(this.splitSelectors(clause), function(selector, selectorIndex) {
+      _.each(def.splitSelectors(clause), function(selector, selectorIndex) {
 
         type = force || def.selectorType(selector);
         force = null;
@@ -10931,7 +10926,7 @@ window.CSSpec = window.CSSpec || {};
 
     applyClass: function($el, cls, invert) {
       var has = $el.hasClass(cls);
-      if (!has || (invert && has)) {
+      if ((!invert && !has) || (invert && has)) {
         $el.toggleClass(cls, !invert);
         this.revert(function() { $el.toggleClass(cls, invert); });
       }
@@ -10939,7 +10934,7 @@ window.CSSpec = window.CSSpec || {};
 
     applyId: function($el, id, invert) {
       var saveId = $el.attr('id');
-      if (id !== saveId || (invert && id === saveId)) {
+      if ((!invert && id !== saveId) || (invert && id === saveId)) {
         $el.attr('id', invert ? '' : id);
         this.revert(function() { $el.attr('id', saveId); });
       }
@@ -10995,10 +10990,10 @@ window.CSSpec = window.CSSpec || {};
 
       _.each(this.clauses, function(clause) {
 
-        var selectors = self.splitSelectors(clause),
+        var selectors = def.splitSelectors(clause),
             types = _.map(selectors, def.selectorType);
 
-        _.each(self.splitSelectors(clause), function(selector, i) {
+        _.each(selectors, function(selector, i) {
           if (types[i] === 'selector') {
             if ((i > 0) && (types[i - 1] === 'stateSelector')) {
               if ((i > 2) && (types[i - 2] === 'selector') && (types[i - 3] === 'stateSelector')) {
@@ -11115,6 +11110,11 @@ window.CSSpec = window.CSSpec || {};
       if (/^\.-when/.test(selector)) return 'state';
       if (/^\.-it/.test(selector)) return 'test'; 
       return 'selector';   
+    },
+
+    // Split a clause into component selectors.
+    splitSelectors: function(clause) {
+      return clause.match(/(\:not\()?[.#:]*[^.#:]+\)?/g);
     },
 
     csspecSelectorToNaturalLanguage: function(csspecClass, omitType) {

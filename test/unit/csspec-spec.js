@@ -103,6 +103,25 @@ describe('CSSpec', function(){
     });
   });
 
+  describe('#splitSelectors', function() {
+    it('should keep a single selector unsplit', function() {
+      expect(def.splitSelectors('.some-class')).toEqual(['.some-class']);
+      expect(def.splitSelectors('#someId')).toEqual(['#someId']);
+      expect(def.splitSelectors(':not(.some-class)')).toEqual([':not(.some-class)']);
+      expect(def.splitSelectors(':not(.someId)')).toEqual([':not(.someId)']);
+      expect(def.splitSelectors(':psuedo-state')).toEqual([':psuedo-state']);
+    });
+    it('should split multiple selectors into components', function() {
+      expect(def.splitSelectors('.class1.class2')).toEqual(['.class1', '.class2']);
+      expect(def.splitSelectors('#id1#id2')).toEqual(['#id1', '#id2']);
+      expect(def.splitSelectors('.classA#idB')).toEqual(['.classA', '#idB']);
+      expect(def.splitSelectors('.classA:hover')).toEqual(['.classA', ':hover']);
+      expect(def.splitSelectors('.classA:not(#idB)')).toEqual(['.classA', ':not(#idB)']);
+      expect(def.splitSelectors(':not(.classA)#idB')).toEqual([':not(.classA)', '#idB']);
+      expect(def.splitSelectors('#idA:not(:focus)')).toEqual(['#idA', ':not(:focus)']);
+    });
+  });
+
   describe('.csspecSelectorToNaturalLanguage', function() {
     var meth = def.csspecSelectorToNaturalLanguage;
     it('should change hyphens into spaces', function() {

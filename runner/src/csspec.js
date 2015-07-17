@@ -93,6 +93,11 @@ window.CSSpec = window.CSSpec || {};
       return 'selector';   
     },
 
+    // Split a clause into component selectors.
+    splitSelectors: function(clause) {
+      return clause.match(/(\:not\()?[.#:]*[^.#:]+\)?/g);
+    },
+
     csspecSelectorToNaturalLanguage: function(csspecClass, omitType) {
       if (def.selectorType(csspecClass) === 'selector') return null;
       return _.rest(csspecClass.split('-'), omitType ? 2 : 1).join(' ').trim();
