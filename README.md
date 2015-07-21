@@ -62,6 +62,31 @@ This compiles to:
 
 The resulting two tests, "my feature by default should not be displayed" and "my feature when activated should be displayed", are tested comparing the actual DOM element properties to the expectations defined inside each -it- clause.
 
+Right-hand expressions inside of -it- blocks can evaluate other attributes of the target element, its children, its selector parents, or cousins (which provides access to the full document).
+
+    describe my nested boxes
+      .parent-box
+        .child-box
+          it should be square
+            height: [width]
+          it should inherit text color
+            color: &&[color]
+          it should correspond in text alignment of its first child
+            text-align: :first-child[text-align]
+          it should match the dimensions of its siblings
+            height: (&& > *)[height]
+            width: (&& > *)[width]
+          it should have the same font as the document
+            font: ^body[font]
+
+Obviously dancing around issues of comparison and calculation for the time being. :)
+
+* & is the self operator: the same as no selector, so generally not required.
+* && is the immediate selector parent (not DOM parent).
+* &&& is the grandparent, etc.
+* ^ represents the full selector parent hierarchy.
+* If not qualified with the above operators, the selector is applied within the current element. 
+
 Vision
 ------
 
