@@ -93,6 +93,13 @@ window.CSSpec = window.CSSpec || {};
       return 'selector';   
     },
 
+    // split a compound selector into element-level clauses
+    splitClauses: function(selector) {
+      return selector.trim().replace(/(>|\+|~|\^|&+)\s*/g, function(match, p1) {
+        return ' ' + p1;
+      }).split(/\s+/);
+    },
+
     // Split a clause into component selectors.
     splitSelectors: function(clause) {
       return clause.match(/(\:not\()?[.#:]*[^.#:]+\)?/g);

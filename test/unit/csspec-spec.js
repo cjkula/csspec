@@ -103,7 +103,33 @@ describe('CSSpec', function(){
     });
   });
 
-  describe('#splitSelectors', function() {
+      // split a compound selector into element-level clauses
+    // splitClauses: function(selector) {
+    //   return selector.replace(/(>|\+|~)\s*/g, function(match, p1) {
+    //     return ' ' + p1;
+    //   }).split(/\s+/);
+    // },
+
+
+  describe('splitClauses', function() {
+    it('should split elements by whitespace', function() {
+      expect(def.splitClauses(' #id123 ')).toEqual(['#id123']);
+      expect(def.splitClauses(" .my-class\t.this#element")).toEqual(['.my-class', '.this#element']);
+    });
+    it('should split elements by descendent and sibling operators', function() {
+      expect(def.splitClauses('.first>.second')).toEqual(['.first', '>.second']);
+      expect(def.splitClauses('.first+.second')).toEqual(['.first', '+.second']);
+      expect(def.splitClauses('.first~.second')).toEqual(['.first', '~.second']);
+    });
+    it('should group descendent operators with the subsequent clause regardless of whitespace', function() {
+      expect(def.splitClauses('.first > .second')).toEqual(['.first', '>.second']);
+      expect(def.splitClauses(".first+\t.second")).toEqual(['.first', '+.second']);
+      expect(def.splitClauses(".first    ~.second")).toEqual(['.first', '~.second']);
+    });
+  });
+
+
+  describe('splitSelectors', function() {
     it('should keep a single selector unsplit', function() {
       expect(def.splitSelectors('.some-class')).toEqual(['.some-class']);
       expect(def.splitSelectors('#someId')).toEqual(['#someId']);

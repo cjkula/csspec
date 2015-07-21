@@ -3,7 +3,10 @@
 describe('test case', function(){
 
   var instance = function(selector, cssRule) {
-    return new CSSpec.TestCase(selector, cssRule);
+    return new CSSpec.TestCase(
+                  selector || '.sample-class', 
+                  cssRule  || { selectorText: (selector || '.sample-class'), style: [] }
+               );
   }
 
 
@@ -17,28 +20,47 @@ describe('test case', function(){
           testCase = instance('.selector', rule);
       expect(testCase.cssRule).toBe(rule);
     });
+    it('should create Expectations from the style rule', function() {
+      var testCase;
+      spyOn(CSSpec.TestCase.prototype, 'createExpectations').and.returnValue(['e1', 'e2']);
+      testCase = instance();
+      expect(CSSpec.TestCase.prototype.createExpectations).toHaveBeenCalled();
+      expect(testCase.expectations).toEqual(['e1', 'e2']);
+    });
+  });
+
+
+  describe('#createExpectations', function() {
+    it('should return expectations array', function() {
+      var testCase = instance(), style, expectations;
+      style = ['color', 'display'];
+      style.color = 'blue';
+      style.display = 'none';
+      expectations = testCase.createExpectations(style);
+      expect(expectations.length).toBe(2);
+      expect(expectations[0].testCase).toBe(testCase);
+      expect(expectations[1].testCase).toBe(testCase);
+      expect(expectations[0].attribute).toBe('color');
+      expect(expectations[1].attribute).toBe('display');
+      expect(expectations[0].expected).toBe('blue');
+      expect(expectations[1].expected).toBe('none');
+    });
   });
 
 
   describe('#exec', function() {
     var testCase;
     beforeEach(function() {
-      testCase = instance('.element', { style: [] });
-    });
-    it('should clear the failures log object', function() {
-      testCase.failures = ['something to clear'];
-      testCase.exec();
-      expect(testCase.failures).toEqual([]);
+      testCase = instance();
     });
     it('should set the result to "pending" if there are no expectations', function() {
       testCase.exec();
       expect(testCase.result).toEqual('pending');
     });
     it('should evalute expectations with #testTarget', function() {
-      testCase.cssRule = { style: ['position'] };
+      testCase.expectations = [new CSSpec.Expectation(testCase, 'position', 'fixed')];
       spyOn(testCase, 'testTarget').and.returnValue('RESULT');
       testCase.exec();
-      expect(testCase.testTarget.calls.argsFor(0)[0]).toEqual(['position']);
       expect(testCase.result).toEqual('RESULT');
     });
   });
@@ -47,28 +69,29 @@ describe('test case', function(){
   describe('#testTarget', function() {
     var testCase;
     beforeEach(function() {
-      testCase = instance('.element', { style: [] });
+      testCase = instance();
     });
     it('should set the target by applying the clauses to the fixture', function() {
       spyOn(testCase, 'applyClauses').and.returnValue(['TARGET']);
-      spyOn(testCase, 'targetMeetsExpectations');
-      testCase.testTarget(['property']);
+      spyOn(testCase, 'checkExpectations');
+      testCase.expectations = [new CSSpec.Expectation(testCase, 'position', 'relative')];
+      testCase.testTarget();
       expect(testCase.applyClauses).toHaveBeenCalled();
       expect(testCase.$target).toEqual(['TARGET']);
     });
     it('should return "inapplicable" if target is empty', function() {
       spyOn(testCase, 'applyClauses').and.returnValue([]);
-      expect(testCase.testTarget(['property'])).toEqual('inapplicable');
+      expect(testCase.testTarget()).toEqual('inapplicable');
     });
-    it('should return "pass" if #targetMeetsExpectations', function() {
+    it('should return "pass" if #checkExpectations passes', function() {
       spyOn(testCase, 'applyClauses').and.returnValue(['TARGET']);
-      spyOn(testCase, 'targetMeetsExpectations').and.returnValue(true);
-      expect(testCase.testTarget(['property'])).toEqual('pass');
+      spyOn(testCase, 'checkExpectations').and.returnValue(true);
+      expect(testCase.testTarget()).toEqual('pass');
     });
-    it('should return "fail" if !#targetMeetsExpectations', function() {
+    it('should return "fail" if #checkExpectations fails', function() {
       spyOn(testCase, 'applyClauses').and.returnValue(['TARGET']);
-      spyOn(testCase, 'targetMeetsExpectations').and.returnValue(false);
-      expect(testCase.testTarget(['property'])).toEqual('fail');
+      spyOn(testCase, 'checkExpectations').and.returnValue(false);
+      expect(testCase.testTarget()).toEqual('fail');
     });
   });
 
@@ -79,7 +102,7 @@ describe('test case', function(){
     $fixture.appendTo('body');
 
     function target(selector) {
-      return instance(selector, {}).applyClauses($fixture);
+      return instance(selector).applyClauses($fixture);
     }
     // Applies CSS properties with an inline stylesheet executes a callback
     // to run tests and finally deletes the <style> block. The second argument
@@ -102,7 +125,15 @@ describe('test case', function(){
 
     describe('selected by class and id' ,function() {
       beforeEach(function() {
-        $fixture.html('<div id="element1" class="single multiple"><span id="inner1" class="inner"></span></div><div id="element2" class="multiple"></div>');
+        $fixture.html('<p id="first1" class="first"></p>' +
+                      '<div id="element1" class="single multiple">' +
+                        '<span id="inner1" class="inner"></span>' +
+                      '</div>' +
+                      '<div id="element2" class="multiple">' +
+                        '<div id="nested1" class="nested">' +
+                          '<div id="nested2" class="nested"></div>' +
+                        '</div>' +
+                      '</div>');
       });
       it('should select an element by class', function() {
         expect(idsFromSelector('.single')).toEqual(['element1']);
@@ -132,6 +163,18 @@ describe('test case', function(){
       });
       it('should select by negative id', function() {
         expect(idsFromSelector('.multiple:not(#element2)')).toEqual(['element1']);
+      });
+      it('should select using immediate child operator', function() {
+        expect(idsFromSelector('.multiple > .nested')).toEqual(['nested1']);
+      });
+      it('should select using adjacent sibling operator', function() {
+        expect(idsFromSelector('.multiple + .multiple')).toEqual(['element2']);
+      });
+      it('should select using general sibling operator', function() {
+        expect(idsFromSelector('.first ~ .multiple')).toEqual(['element1', 'element2']);
+      });
+      it('should result in a $target which references the full selection string', function() {
+        expect(target('div .nested > .nested').selector).toEqual('div .nested >.nested');
       });
     });
 
@@ -281,39 +324,36 @@ describe('test case', function(){
 
   });
 
-  describe('#targetMeetsExpectations', function() {
+  describe('#checkExpectations', function() {
     var testCase;
     beforeEach(function() {
-      testCase = instance('.element', {});
+      testCase = instance();
+      testCase.expectations = [
+        new CSSpec.Expectation(testCase, 'first', 'one'),
+        new CSSpec.Expectation(testCase, 'second', 'two'),
+        new CSSpec.Expectation(testCase, 'third', 'three')
+      ];
     });
     it('should check each expectation', function() {
-      var expectations = ['first', 'second', 'third'];
-      expectations.first = 'one';
-      expectations.second = 'two';
-      expectations.third = 'three';
-      testCase.$target = ['t'];
-      spyOn(testCase, 'meetsExpectation').and.returnValue(true);
-      testCase.targetMeetsExpectations(expectations);
-      expect(testCase.meetsExpectation.calls.argsFor(0)).toEqual([['t'], 'first', 'one']);
+      spyOn(CSSpec.Expectation.prototype, 'test').and.returnValue(true);
+      testCase.checkExpectations();
+      expect(CSSpec.Expectation.prototype.test.calls.count()).toEqual(3);
     });
     it('should return true if all expectations pass', function() {
-      var expectations = ['first', 'second'];
-      expectations.first = 'one';
-      expectations.second = 'two';
-      spyOn(testCase, 'meetsExpectation').and.returnValue(true);
-      expect(testCase.targetMeetsExpectations(expectations)).toEqual(true);
+      spyOn(CSSpec.Expectation.prototype, 'test').and.returnValue(true);
+      expect(testCase.checkExpectations()).toEqual(true);
     });
     it('should return false if an expectation fails', function() {
       var expectations = ['first', 'second'],
           alreadyCalled = false;
       expectations.first = 'one';
       expectations.second = 'two';
-      spyOn(testCase, 'meetsExpectation').and.callFake(function() {
+      spyOn(CSSpec.Expectation.prototype, 'test').and.callFake(function() {
         if (alreadyCalled) return false;
         alreadyCalled = true;
         return true;
       });
-      expect(testCase.targetMeetsExpectations(expectations)).toEqual(false);
+      expect(testCase.checkExpectations(expectations)).toEqual(false);
     });
   });
 
@@ -321,7 +361,7 @@ describe('test case', function(){
   describe('#applyContent', function() {
     var testCase, $el;
     beforeEach(function() {
-      testCase = instance('.example', {});
+      testCase = instance();
       $el = $('<div class="element">ORIGINAL CONTENT</div>').appendTo('body');
     });
     afterEach(function() {
@@ -376,7 +416,7 @@ describe('test case', function(){
 
 
   describe('#applySelectors', function() {
-    var calls, testCase = instance('.example', {});
+    var calls, testCase = instance();
     it('should apply each selector', function() {
       spyOn(testCase, 'applySelector');
       testCase.applySelectors(['#id', '.class'], $('<div />'));
@@ -389,7 +429,7 @@ describe('test case', function(){
   describe('#applySelector', function() {
     var testCase, $el = $('<div />');
     beforeEach(function() {
-      testCase = instance('.example', {});
+      testCase = instance();
       spyOn(testCase, 'applyClass');
       spyOn(testCase, 'applyId');
     });
@@ -413,7 +453,7 @@ describe('test case', function(){
 
   describe('#applyClass', function() {
     it('should add a class to the element and push a revert function', function() {
-      var testCase = instance('.example', {}), 
+      var testCase = instance(), 
           $el = $('<div />');
       testCase.rollbackStack = [];
       testCase.applyClass($el, 'my-class');
@@ -422,7 +462,7 @@ describe('test case', function(){
       expect($el.hasClass('my-class')).toBe(false);      
     });
     it('should remove a class from the element and push a revert function', function() {
-      var testCase = instance('.example', {}), 
+      var testCase = instance(), 
           $el = $('<div class="remove-this" />');
       testCase.rollbackStack = [];
       testCase.applyClass($el, 'remove-this', true);
@@ -431,7 +471,7 @@ describe('test case', function(){
       expect($el.hasClass('remove-this')).toBe(true);      
     });
     it('should not remove a class from the element if not present', function() {
-      var testCase = instance('.example', {}), 
+      var testCase = instance(), 
           $el = $('<div class="do-not-remove-this" />');
       testCase.rollbackStack = [];
       testCase.applyClass($el, 'remove-this', true);
@@ -442,28 +482,25 @@ describe('test case', function(){
 
 
   describe('#applyId', function() {
-    it('should change the element ID and push a revert function', function() {
-      var testCase = instance('.example', {}), 
-          $el = $('<div id="original" />');
+    var testCase, $el;
+    beforeEach(function() {
+      testCase = instance();
+      $el = $('<div id="original" />');
       testCase.rollbackStack = [];
+    });
+    it('should change the element ID and push a revert function', function() {
       testCase.applyId($el, 'new');
       expect($el.attr('id')).toEqual('new');
       testCase.rollbackStack[0]();
       expect($el.attr('id')).toEqual('original');
     });
     it('should remove the element ID and push a revert function', function() {
-      var testCase = instance('.example', {}),
-          $el = $('<div id="original" />');
-      testCase.rollbackStack = [];
       testCase.applyId($el, 'original', true);
       expect($el.attr('id')).toEqual('');
       testCase.rollbackStack[0]();
       expect($el.attr('id')).toEqual('original');
     });
     it('should not remove the ID if does present', function() {
-      var testCase = instance('.example', {}),
-          $el = $('<div id="original" />');
-      testCase.rollbackStack = [];
       testCase.applyId($el, 'another', true);
       expect($el.attr('id')).toEqual('original');
       expect(testCase.rollbackStack.length).toEqual(0);
@@ -472,23 +509,23 @@ describe('test case', function(){
 
 
   describe('#revert', function() {
-    var testCase = instance('.example', {}),
-        sampleFunc = function(myfunc) {};
+    var testCase = instance(),
+        dummyFunc = function(myfunc) {};
     it('should create rollbackStack if necessary', function() {
       testCase.rollbackStack = null;
-      testCase.revert(sampleFunc);
-      expect(testCase.rollbackStack).toEqual([sampleFunc]);
+      testCase.revert(dummyFunc);
+      expect(testCase.rollbackStack).toEqual([dummyFunc]);
     });
     it('should append a function to the stack', function() {
       testCase.rollbackStack = [ function(otherFunc){} ];
-      testCase.revert(sampleFunc);
-      expect(testCase.rollbackStack[1]).toEqual(sampleFunc);
+      testCase.revert(dummyFunc);
+      expect(testCase.rollbackStack[1]).toEqual(dummyFunc);
     });
   });
 
 
   describe('#revertAfter', function() {
-    var testCase = instance('.example', {});
+    var testCase = instance();
     it('should clear the rollback stack', function() {
       testCase.rollbackStack = ['not empty'];
       testCase.revertAfter(function() {
@@ -523,63 +560,6 @@ describe('test case', function(){
   });
 
 
-  describe('#meetsExpectation', function() {
-    var testCase = instance('.example', {});
-    beforeEach(function() {
-      testCase.failures = [];
-      spyOn(testCase, 'resolveAttribute').and.returnValue('resolved value');
-    });
-    describe('when the resolved attribute equals the expectation', function() {
-      it('should return true', function() {
-        expect(testCase.meetsExpectation($('<div />'), 'dummy', 'resolved value')).toBe(true);
-      });
-      it('should not report a failure', function() {
-        testCase.meetsExpectation($('<div />'), 'dummy', 'resolved value');
-        expect(testCase.failures.length).toEqual(0);
-      });
-    });
-    describe('when the resolved attribute does not equal the expectation', function() {
-      it('should return false', function() {
-        expect(testCase.meetsExpectation($('<div />'), 'dummy', 'expected value')).toBe(false);
-      });
-      it('should report a failure', function() {
-        testCase.meetsExpectation($('<div />'), 'dummy', 'expected value');
-        expect(testCase.failures.length).toEqual(1);
-      });
-    });
-  });
-
-
-  // not ready for prime time
-  describe('#resolveAttribute', function() {
-    var testCase = instance('.example', {}),
-        $el = $('<div />', {
-          css: {
-            position     : 'fixed',
-            'margin-top' : '10px',
-            'font-size'  : '20px'
-          }
-        }),
-        $inner = $('<div id="inner" />');
-        $('body').append($el);
-        $($el).append($inner);
-    afterAll(function() {
-      $el.remove();
-    });
-    it('should return normal CSS attributes', function() {
-      expect(testCase.resolveAttribute($el, 'position')).toEqual('fixed');
-      expect(testCase.resolveAttribute($el, 'margin-top')).toEqual('10px');
-    });
-    it('should return default CSS attributes', function() {
-      expect(testCase.resolveAttribute($el, 'display')).toEqual('block');
-      expect(testCase.resolveAttribute($inner, 'position')).toEqual('static');
-    });
-    it('should return inherited CSS attributes', function() {
-      expect(testCase.resolveAttribute($inner, 'font-size')).toEqual('20px');
-    });
-  });
-
-
   // wait to test until karma integration is begun
   describe('#report', function() {
   });
@@ -587,15 +567,15 @@ describe('test case', function(){
 
   describe('#description', function() {
     it('should represent a group with test', function() {
-      var testCase = instance('.-describe-a-thing .-it-should-do-stuff', {});
+      var testCase = instance('.-describe-a-thing .-it-should-do-stuff');
       expect(testCase.description()).toEqual('a thing should do stuff');
     });
     it('should represent nested groups with test', function() {
-      var testCase = instance('.-describe-a-thing .-describe-in-its-native-habitat .-it-should-do-stuff', {});
+      var testCase = instance('.-describe-a-thing .-describe-in-its-native-habitat .-it-should-do-stuff');
       expect(testCase.description()).toEqual('a thing in its native habitat should do stuff');
     });
     it('should represent a group, state and test', function() {
-      var testCase = instance('.-describe-a-thing.-when-properly-arranged .-it-should-do-stuff', {});
+      var testCase = instance('.-describe-a-thing.-when-properly-arranged .-it-should-do-stuff');
       expect(testCase.description()).toEqual('a thing properly arranged should do stuff');
     });
   });

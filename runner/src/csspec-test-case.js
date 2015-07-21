@@ -7,28 +7,35 @@ window.CSSpec = window.CSSpec || {};
 
   // constructor
   CSSpec.TestCase = function(ruleSelector, cssRule) {
-    this.clauses = ruleSelector.split(/\s+/);
+    this.clauses = def.splitClauses(ruleSelector);
     this.cssRule = cssRule;
+    this.expectations = this.createExpectations(cssRule.style);
   };
 
   def.TestCase.prototype = {
 
+    // returns an Expectation object for each CSS name-value pair
+    createExpectations: function(cssStyle) {
+      var testCase = this;
+      return _.map(cssStyle, function(attrName) {
+        return new def.Expectation(testCase, attrName, cssStyle[attrName]);
+      });
+    },
+
     // Evaluate test case if any expectations set (otherwise return 'pending').
     exec: function() {
-      var expectations = this.cssRule.style;
-      this.failures = [];
-      this.result = expectations.length > 0 ? this.testTarget(expectations) : 'pending';
+      this.result = this.expectations.length > 0 ? this.testTarget() : 'pending';
     },
 
     // Apply selectors and fixure content to the selected element(s) and evaluate test case.
     // Revert DOM state after completed.
-    testTarget: function(expectations) {
+    testTarget: function() {
       return this.revertAfter(function() {
 
         this.$target = this.applyClauses(def.$fixture);
 
         return this.$target.length === 0 ? 'inapplicable' :
-               (this.targetMeetsExpectations(expectations) ? 'pass' : 'fail');
+               (this.checkExpectations() ? 'pass' : 'fail');
       });
     },
 
@@ -48,13 +55,12 @@ window.CSSpec = window.CSSpec || {};
     },
 
     // Boolean: does this.$target pass the tests?
-    targetMeetsExpectations: function(expectations) {
-      var i, attrName, pass = true;
+    checkExpectations: function() {
+      var i, pass = true;
 
-      // keeping it local so can return on first failure if preferred
-      for (i = 0; i < expectations.length; i++) {
-        attrName = expectations[i];
-        if (!this.meetsExpectation(this.$target, attrName, expectations[attrName]))
+      // local loop so can return on first failure if preferred
+      for (i = 0; i < this.expectations.length; i++) {
+        if (!this.expectations[i].test())
           pass = false;
       }
       return pass;
@@ -200,29 +206,16 @@ window.CSSpec = window.CSSpec || {};
       return result;
     },
 
-    meetsExpectation: function($target, attrName, expectedValue) {
-      var actual = this.resolveAttribute($target, attrName);
-
-      if (actual === expectedValue) return true;
-
-      this.failures.push('expected :' + attrName + 
-                         ' to be ' + expectedValue +
-                         ' but was ' + actual + '.');
-      return false;
-    },
-
-    resolveAttribute: function($target, attrName) {
-      var value = $target.css(attrName);
-      return value || window.getComputedStyle($target.get(0))[attrName];
-    },
-
 
     report: function() {
       var label = this.result === 'pass' ? 'SUCCESS' : (this.result === 'fail' ? 'FAILURE' : 'PENDING');
       
       console.log(label + ': ' + this.description());
-      _.each(this.failures, function(failure) {
-        console.log('    ' + failure);
+      _.chain(this.expectations)
+      .pluck('error')
+      .compact()
+      .each(function(error) {
+        console.log('    ' + error);
       });
     },
   

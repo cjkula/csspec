@@ -10766,29 +10766,131 @@ window.CSSpec = window.CSSpec || {};
   var def = CSSpec;
 
   // constructor
+  CSSpec.Expectation = function(testCase, attrName, expectedExpr) {
+    this.testCase = testCase;
+    this.attribute = attrName;
+    this.expected = expectedExpr;
+  };
+
+  def.Expectation.prototype = {
+
+    test: function() {
+      var actual = this.resolveAttribute(this.testCase.$target, this.attribute),
+          expected = this.resolveExpression(this.testCase.$target, this.expected);
+
+      if (actual === expected) return true;
+      this.error = 'expected :' + this.attribute + ' to be ' + expected +' but was ' + actual + '.';
+      return false;
+    },
+
+    resolveAttribute: function($el, attrName) {
+      var el = $el[0];
+      return this.customAttribute($el, attrName)
+        || $el.css(attrName) 
+        || (el.currentStyle && el.currentStyle[attrName]) 
+        || window.getComputedStyle(el)[attrName];
+    },
+
+    customAttribute: function($el, attrName) {
+      return null;
+    },
+
+    resolveExpression: function($el, expression) { 
+      var re = /\(?(([.#:]*[^.#:)]+\s*)*)\)?\[([^\]]+)\]/g;
+      return expression.replace(re, _.bind(function(m, selectors, _, attribute) {
+        var $target = selectors ? this.resolveRelativeElement(selectors, $el): $el;
+        return this.resolveAttribute($target, attribute);
+      }, this));
+    },
+
+    resolveRelativeElement: function(relativeSelector, $current) {
+      var clauses = def.splitClauses($current.selector),
+          m = relativeSelector.match(/(\^)?(&+)?(\S*)(\s+(.+))?/),
+          caret = m[1],
+          ampersandCount = (m[2] || '').length,
+          selector = m[3],
+          childSelectors = m[4],
+          initialClauses,
+          $ret;
+
+      if(caret) {
+        $ret = $current.parents();
+
+      } else if (ampersandCount === 0) {
+        $ret = $current;
+        childSelectors = ((selector || '') + ' ' + (childSelectors || '')).trim();
+        selector = null;
+
+      } else if (ampersandCount === 1) {
+
+        $ret = $current;
+
+      } else {
+
+        initialClauses = _.initial(clauses, ampersandCount - 1).join(' ');
+
+        switch(_.last(clauses).charAt(0)) {
+          case '>': // trace back to immediate ancestor
+            $ret = $current.parent();
+            break;
+          case '+': // trace back to adjacent sibling
+            $ret = $current.prev();
+            break;
+          case '~': // check all previous siblings
+            $ret = $current.prevAll(initialClauses);
+            break;
+          default:  // check all ancestors
+            $ret = $current.parents(initialClauses);
+        }
+      }
+
+      if (selector) $ret = $ret.filter(selector);
+      if (childSelectors) $ret = $ret.find(childSelectors);
+
+      return $ret;
+    }
+
+  };
+
+})(jQuery, _);
+'use strict';
+
+window.CSSpec = window.CSSpec || {};
+
+(function($, _) {
+  var def = CSSpec;
+
+  // constructor
   CSSpec.TestCase = function(ruleSelector, cssRule) {
-    this.clauses = ruleSelector.split(/\s+/);
+    this.clauses = def.splitClauses(ruleSelector);
     this.cssRule = cssRule;
+    this.expectations = this.createExpectations(cssRule.style);
   };
 
   def.TestCase.prototype = {
 
+    // returns an Expectation object for each CSS name-value pair
+    createExpectations: function(cssStyle) {
+      var testCase = this;
+      return _.map(cssStyle, function(attrName) {
+        return new def.Expectation(testCase, attrName, cssStyle[attrName]);
+      });
+    },
+
     // Evaluate test case if any expectations set (otherwise return 'pending').
     exec: function() {
-      var expectations = this.cssRule.style;
-      this.failures = [];
-      this.result = expectations.length > 0 ? this.testTarget(expectations) : 'pending';
+      this.result = this.expectations.length > 0 ? this.testTarget() : 'pending';
     },
 
     // Apply selectors and fixure content to the selected element(s) and evaluate test case.
     // Revert DOM state after completed.
-    testTarget: function(expectations) {
+    testTarget: function() {
       return this.revertAfter(function() {
 
         this.$target = this.applyClauses(def.$fixture);
 
         return this.$target.length === 0 ? 'inapplicable' :
-               (this.targetMeetsExpectations(expectations) ? 'pass' : 'fail');
+               (this.checkExpectations() ? 'pass' : 'fail');
       });
     },
 
@@ -10808,13 +10910,12 @@ window.CSSpec = window.CSSpec || {};
     },
 
     // Boolean: does this.$target pass the tests?
-    targetMeetsExpectations: function(expectations) {
-      var i, attrName, pass = true;
+    checkExpectations: function() {
+      var i, pass = true;
 
-      // keeping it local so can return on first failure if preferred
-      for (i = 0; i < expectations.length; i++) {
-        attrName = expectations[i];
-        if (!this.meetsExpectation(this.$target, attrName, expectations[attrName]))
+      // local loop so can return on first failure if preferred
+      for (i = 0; i < this.expectations.length; i++) {
+        if (!this.expectations[i].test())
           pass = false;
       }
       return pass;
@@ -10960,29 +11061,16 @@ window.CSSpec = window.CSSpec || {};
       return result;
     },
 
-    meetsExpectation: function($target, attrName, expectedValue) {
-      var actual = this.resolveAttribute($target, attrName);
-
-      if (actual === expectedValue) return true;
-
-      this.failures.push('expected :' + attrName + 
-                         ' to be ' + expectedValue +
-                         ' but was ' + actual + '.');
-      return false;
-    },
-
-    resolveAttribute: function($target, attrName) {
-      var value = $target.css(attrName);
-      return value || window.getComputedStyle($target.get(0))[attrName];
-    },
-
 
     report: function() {
       var label = this.result === 'pass' ? 'SUCCESS' : (this.result === 'fail' ? 'FAILURE' : 'PENDING');
       
       console.log(label + ': ' + this.description());
-      _.each(this.failures, function(failure) {
-        console.log('    ' + failure);
+      _.chain(this.expectations)
+      .pluck('error')
+      .compact()
+      .each(function(error) {
+        console.log('    ' + error);
       });
     },
   
@@ -11112,6 +11200,13 @@ window.CSSpec = window.CSSpec || {};
       if (/^\.-when/.test(selector)) return 'state';
       if (/^\.-it/.test(selector)) return 'test'; 
       return 'selector';   
+    },
+
+    // split a compound selector into element-level clauses
+    splitClauses: function(selector) {
+      return selector.trim().replace(/(>|\+|~|\^|&+)\s*/g, function(match, p1) {
+        return ' ' + p1;
+      }).split(/\s+/);
     },
 
     // Split a clause into component selectors.
