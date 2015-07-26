@@ -1,49 +1,55 @@
 'use strict';
 
 describe('test case', function(){
+  var mod = CSSpec;
 
-  var instance = function(selector, cssRule) {
-    return new CSSpec.TestCase(
+  var instance = function(selector, rule) {
+    return new mod.TestCase(
                   selector || '.sample-class', 
-                  cssRule  || { selectorText: (selector || '.sample-class'), style: [] }
+                  rule     || { selectors: [selector || '.sample-class'], declarations: [] }
                );
   }
 
 
-  describe('new', function() {
+  describe('::new', function() {
     it('should split the selector into element clauses', function() {
       var testCase = instance('#first-clause .second-clause.-it-is-a-thing');
       expect(testCase.clauses).toEqual(['#first-clause', '.second-clause.-it-is-a-thing']);
     });
     it('keeps a reference to the rule', function() {
-      var rule = { selectorText: '.selector, .other' },
-          testCase = instance('.selector', rule);
-      expect(testCase.cssRule).toBe(rule);
+      var rule = { selectors: '.selector, .other' },
+        testCase = instance('.selector', rule);
+      expect(testCase.rule).toBe(rule);
     });
     it('should create Expectations from the style rule', function() {
       var testCase;
-      spyOn(CSSpec.TestCase.prototype, 'createExpectations').and.returnValue(['e1', 'e2']);
+      spyOn(mod.TestCase.prototype, 'createExpectations');
       testCase = instance();
-      expect(CSSpec.TestCase.prototype.createExpectations).toHaveBeenCalled();
-      expect(testCase.expectations).toEqual(['e1', 'e2']);
+      expect(mod.TestCase.prototype.createExpectations).toHaveBeenCalled();
+    });
+    it('should pass property declarations to #createExpectations', function() {
+      var testCase, 
+          declarations = [{ property: 'color', value: 'red'}];
+      spyOn(mod.TestCase.prototype, 'createExpectations');
+      testCase = instance(null, { declarations: declarations });
+      expect(mod.TestCase.prototype.createExpectations).toHaveBeenCalledWith(declarations);
+
     });
   });
 
 
   describe('#createExpectations', function() {
     it('should return expectations array', function() {
-      var testCase = instance(), style, expectations;
-      style = ['color', 'display'];
-      style.color = 'blue';
-      style.display = 'none';
-      expectations = testCase.createExpectations(style);
-      expect(expectations.length).toBe(2);
-      expect(expectations[0].testCase).toBe(testCase);
-      expect(expectations[1].testCase).toBe(testCase);
-      expect(expectations[0].attribute).toBe('color');
-      expect(expectations[1].attribute).toBe('display');
-      expect(expectations[0].expected).toBe('blue');
-      expect(expectations[1].expected).toBe('none');
+      var testCase = instance();
+      testCase.createExpectations([{ property: 'color',   value: 'blue'}, 
+                                   { property: 'display', value: 'none'}]);
+      expect(testCase.expectations.length).toBe(2);
+      expect(testCase.expectations[0].testCase).toBe(testCase);
+      expect(testCase.expectations[1].testCase).toBe(testCase);
+      expect(testCase.expectations[0].attribute).toBe('color');
+      expect(testCase.expectations[1].attribute).toBe('display');
+      expect(testCase.expectations[0].expected).toBe('blue');
+      expect(testCase.expectations[1].expected).toBe('none');
     });
   });
 
@@ -58,7 +64,7 @@ describe('test case', function(){
       expect(testCase.result).toEqual('pending');
     });
     it('should evalute expectations with #testTarget', function() {
-      testCase.expectations = [new CSSpec.Expectation(testCase, 'position', 'fixed')];
+      testCase.expectations = [new mod.Expectation(testCase, 'position', 'fixed')];
       spyOn(testCase, 'testTarget').and.returnValue('RESULT');
       testCase.exec();
       expect(testCase.result).toEqual('RESULT');
@@ -74,7 +80,7 @@ describe('test case', function(){
     it('should set the target by applying the clauses to the fixture', function() {
       spyOn(testCase, 'applyClauses').and.returnValue(['TARGET']);
       spyOn(testCase, 'checkExpectations');
-      testCase.expectations = [new CSSpec.Expectation(testCase, 'position', 'relative')];
+      testCase.expectations = [new mod.Expectation(testCase, 'position', 'relative')];
       testCase.testTarget();
       expect(testCase.applyClauses).toHaveBeenCalled();
       expect(testCase.$target).toEqual(['TARGET']);
@@ -97,12 +103,14 @@ describe('test case', function(){
 
 
   describe('#applyClauses', function() {
-    var $fixture = $('<div id="fixture" />');
+    var testCase,
+        $fixture = $('<div id="fixture" />');
     $('#fixture').remove(); // clean up
     $fixture.appendTo('body');
 
     function target(selector) {
-      return instance(selector).applyClauses($fixture);
+      testCase = instance(selector);
+      return testCase.applyClauses($fixture);
     }
     // Applies CSS properties with an inline stylesheet executes a callback
     // to run tests and finally deletes the <style> block. The second argument
@@ -329,18 +337,18 @@ describe('test case', function(){
     beforeEach(function() {
       testCase = instance();
       testCase.expectations = [
-        new CSSpec.Expectation(testCase, 'first', 'one'),
-        new CSSpec.Expectation(testCase, 'second', 'two'),
-        new CSSpec.Expectation(testCase, 'third', 'three')
+        new mod.Expectation(testCase, 'first', 'one'),
+        new mod.Expectation(testCase, 'second', 'two'),
+        new mod.Expectation(testCase, 'third', 'three')
       ];
     });
     it('should check each expectation', function() {
-      spyOn(CSSpec.Expectation.prototype, 'test').and.returnValue(true);
+      spyOn(mod.Expectation.prototype, 'test').and.returnValue(true);
       testCase.checkExpectations();
-      expect(CSSpec.Expectation.prototype.test.calls.count()).toEqual(3);
+      expect(mod.Expectation.prototype.test.calls.count()).toEqual(3);
     });
     it('should return true if all expectations pass', function() {
-      spyOn(CSSpec.Expectation.prototype, 'test').and.returnValue(true);
+      spyOn(mod.Expectation.prototype, 'test').and.returnValue(true);
       expect(testCase.checkExpectations()).toEqual(true);
     });
     it('should return false if an expectation fails', function() {
@@ -348,7 +356,7 @@ describe('test case', function(){
           alreadyCalled = false;
       expectations.first = 'one';
       expectations.second = 'two';
-      spyOn(CSSpec.Expectation.prototype, 'test').and.callFake(function() {
+      spyOn(mod.Expectation.prototype, 'test').and.callFake(function() {
         if (alreadyCalled) return false;
         alreadyCalled = true;
         return true;
@@ -407,11 +415,10 @@ describe('test case', function(){
 
   // tests after refactor
   describe('#applyClauseSelectors', function() {
+    pending();
   });
-
-
-  // tests after refactor
   describe('#applyQueues', function() {
+    pending();
   });
 
 
@@ -562,6 +569,7 @@ describe('test case', function(){
 
   // wait to test until karma integration is begun
   describe('#report', function() {
+    pending();
   });
 
 

@@ -3,16 +3,16 @@
 window.CSSpec = window.CSSpec || {};
 
 (function($, _) {
-  var def = CSSpec;
+  var mod = CSSpec;
 
   // constructor
-  CSSpec.Expectation = function(testCase, attrName, expectedExpr) {
+  CSSpec.Expectation = function(testCase, attribute, expectedExpr) {
     this.testCase = testCase;
-    this.attribute = attrName;
+    this.attribute = attribute;
     this.expected = expectedExpr;
   };
 
-  def.Expectation.prototype = {
+  mod.Expectation.prototype = {
 
     test: function() {
       var actual = this.resolveAttribute(this.testCase.$target, this.attribute),
@@ -31,8 +31,9 @@ window.CSSpec = window.CSSpec || {};
         || window.getComputedStyle(el)[attrName];
     },
 
-    customAttribute: function($el, attrName) {
-      return null;
+    customAttribute: function($el, attribute) {
+      var fn = mod.elementAttributeFunction($el, attribute);
+      return fn ? fn.call($el[0], $el, attribute, this) : null;
     },
 
     resolveExpression: function($el, expression) { 
@@ -44,7 +45,7 @@ window.CSSpec = window.CSSpec || {};
     },
 
     resolveRelativeElement: function(relativeSelector, $current) {
-      var clauses = def.splitClauses($current.selector),
+      var clauses = mod.splitClauses($current.selector),
           m = relativeSelector.match(/(\^)?(&+)?(\S*)(\s+(.+))?/),
           caret = m[1],
           ampersandCount = (m[2] || '').length,
@@ -57,6 +58,7 @@ window.CSSpec = window.CSSpec || {};
         $ret = $current.parents();
 
       } else if (ampersandCount === 0) {
+
         $ret = $current;
         childSelectors = ((selector || '') + ' ' + (childSelectors || '')).trim();
         selector = null;

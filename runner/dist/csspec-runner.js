@@ -10763,16 +10763,16 @@ return jQuery;
 window.CSSpec = window.CSSpec || {};
 
 (function($, _) {
-  var def = CSSpec;
+  var mod = CSSpec;
 
   // constructor
-  CSSpec.Expectation = function(testCase, attrName, expectedExpr) {
+  CSSpec.Expectation = function(testCase, attribute, expectedExpr) {
     this.testCase = testCase;
-    this.attribute = attrName;
+    this.attribute = attribute;
     this.expected = expectedExpr;
   };
 
-  def.Expectation.prototype = {
+  mod.Expectation.prototype = {
 
     test: function() {
       var actual = this.resolveAttribute(this.testCase.$target, this.attribute),
@@ -10791,8 +10791,9 @@ window.CSSpec = window.CSSpec || {};
         || window.getComputedStyle(el)[attrName];
     },
 
-    customAttribute: function($el, attrName) {
-      return null;
+    customAttribute: function($el, attribute) {
+      var fn = mod.elementAttributeFunction($el, attribute);
+      return fn ? fn.call($el[0], $el, attribute, this) : null;
     },
 
     resolveExpression: function($el, expression) { 
@@ -10804,7 +10805,7 @@ window.CSSpec = window.CSSpec || {};
     },
 
     resolveRelativeElement: function(relativeSelector, $current) {
-      var clauses = def.splitClauses($current.selector),
+      var clauses = mod.splitClauses($current.selector),
           m = relativeSelector.match(/(\^)?(&+)?(\S*)(\s+(.+))?/),
           caret = m[1],
           ampersandCount = (m[2] || '').length,
@@ -10817,6 +10818,7 @@ window.CSSpec = window.CSSpec || {};
         $ret = $current.parents();
 
       } else if (ampersandCount === 0) {
+
         $ret = $current;
         childSelectors = ((selector || '') + ' ' + (childSelectors || '')).trim();
         selector = null;
@@ -10858,22 +10860,806 @@ window.CSSpec = window.CSSpec || {};
 window.CSSpec = window.CSSpec || {};
 
 (function($, _) {
-  var def = CSSpec;
+  var mod = CSSpec;
 
   // constructor
-  CSSpec.TestCase = function(ruleSelector, cssRule) {
-    this.clauses = def.splitClauses(ruleSelector);
-    this.cssRule = cssRule;
-    this.expectations = this.createExpectations(cssRule.style);
+  CSSpec.FnAttributeCollection = function(rules) {
+    this.fnAttributes = {};
+    if (rules) this.createFnAttributes(rules);
   };
 
-  def.TestCase.prototype = {
+  mod.FnAttributeCollection.prototype = {
+
+    createFnAttributes: function(rules) {
+      var self = this,
+          fnAttributes = {};
+      _.each(rules, function(rule) {
+        _.each(rule.declarations, function(declaration) {
+          if (mod.isFnAttribute(declaration.property, declaration.value)) {
+            _.each(rule.selectors, function(selector) {
+              var fn = mod.unwrapFunction(declaration.value);
+              self.appendFnAttribute(declaration.property, fn, selector);          
+            });
+          }
+        });
+      });
+    },
+
+    appendFnAttribute: function(attribute, fn, selector, inline, important) {
+      var fnAttr = new mod.FnAttribute(attribute, fn, selector, inline, important);
+      this.fnAttributes[attribute] = this.fnAttributes[attribute] || [];
+      this.fnAttributes[attribute].push(fnAttr);
+      return fnAttr;
+    },
+
+    matchFnAttribute: function($el, attribute) {
+      var fnAttrs = _.filter(this.fnAttributes[attribute] || [], function(fnAttr) {
+                      return attribute === fnAttr.attribute && $el.is(fnAttr.selector);
+                    });
+
+      if (fnAttrs.length === 0) return null;
+
+      return _.reduce(fnAttrs, function(memo, fnAttr) {
+        return fnAttr.specificity >= memo.specificity ? fnAttr : memo;
+      });
+
+    }
+
+  };
+
+})(jQuery, _);
+'use strict';
+
+window.CSSpec = window.CSSpec || {};
+
+(function($, _) {
+  var mod = CSSpec;
+
+  // constructor
+  CSSpec.FnAttribute = function(attribute, fn, selector, inline, important) {
+    this.attribute = attribute;
+    this.selector = selector;
+    this.fn = fn;
+    this.specificity = mod.selectorSpecificity(selector, inline, important);
+  };
+
+  // mod.FnAttribute.prototype = {
+    
+  // };
+
+})(jQuery, _);
+'use strict';
+
+window.CSSpec = window.CSSpec || {};
+
+// file source, with minor edits, 
+// from https://github.com/reworkcss/css/blob/master/lib/parse/index.js
+// which cites the following license:
+
+// (The MIT License)
+
+// Copyright (c) 2012 TJ Holowaychuk <tj@vision-media.ca>
+
+// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the 'Software'), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+
+// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+// THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+CSSpec.parse = function(css, options) {
+
+  // http://www.w3.org/TR/CSS21/grammar.html
+  // https://github.com/visionmedia/css-parse/pull/49#issuecomment-30088027
+  var commentre = /\/\*[^*]*\*+([^/*][^*]*\*+)*\//g
+
+  options = options || {};
+
+  /**
+   * Trim `str`.
+   */
+
+  function trim(str) {
+    return str ? str.replace(/^\s+|\s+$/g, '') : '';
+  }
+
+  /**
+   * Adds non-enumerable parent node reference to each node.
+   */
+
+  function addParent(obj, parent) {
+    var isNode = obj && typeof obj.type === 'string';
+    var childParent = isNode ? obj : parent;
+
+    for (var k in obj) {
+      var value = obj[k];
+      if (Array.isArray(value)) {
+        value.forEach(function(v) { addParent(v, childParent); });
+      } else if (value && typeof value === 'object') {
+        addParent(value, childParent);
+      }
+    }
+
+    if (isNode) {
+      Object.defineProperty(obj, 'parent', {
+        configurable: true,
+        writable: true,
+        enumerable: false,
+        value: parent || null
+      });
+    }
+
+    return obj;
+  }
+
+
+  /**
+   * Positional.
+   */
+
+  var lineno = 1;
+  var column = 1;
+
+  /**
+   * Update lineno and column based on `str`.
+   */
+
+  function updatePosition(str) {
+    var lines = str.match(/\n/g);
+    if (lines) lineno += lines.length;
+    var i = str.lastIndexOf('\n');
+    column = ~i ? str.length - i : column + str.length;
+  }
+
+  /**
+   * Mark position and patch `node.position`.
+   */
+
+  function position() {
+    var start = { line: lineno, column: column };
+    return function(node){
+      node.position = new Position(start);
+      whitespace();
+      return node;
+    };
+  }
+
+  /**
+   * Store position information for a node
+   */
+
+  function Position(start) {
+    this.start = start;
+    this.end = { line: lineno, column: column };
+    this.source = options.source;
+  }
+
+  /**
+   * Non-enumerable source string
+   */
+
+  Position.prototype.content = css;
+
+  /**
+   * Error `msg`.
+   */
+
+  var errorsList = [];
+
+  function error(msg) {
+    var err = new Error(options.source + ':' + lineno + ':' + column + ': ' + msg);
+    err.reason = msg;
+    err.filename = options.source;
+    err.line = lineno;
+    err.column = column;
+    err.source = css;
+
+    if (options.silent) {
+      errorsList.push(err);
+    } else {
+      console.log(err.stack);
+      throw err;
+    }
+  }
+
+  /**
+   * Parse stylesheet.
+   */
+
+  function stylesheet() {
+    var rulesList = rules();
+
+    return {
+      type: 'stylesheet',
+      stylesheet: {
+        rules: rulesList,
+        parsingErrors: errorsList
+      }
+    };
+  }
+
+  /**
+   * Opening brace.
+   */
+
+  function open() {
+    return match(/^{\s*/);
+  }
+
+  /**
+   * Closing brace.
+   */
+
+  function close() {
+    return match(/^}/);
+  }
+
+  /**
+   * Parse ruleset.
+   */
+
+  function rules() {
+    var node;
+    var rules = [];
+    whitespace();
+    comments(rules);
+    while (css.length && css.charAt(0) != '}' && (node = atrule() || rule())) {
+      if (node !== false) {
+        rules.push(node);
+        comments(rules);
+      }
+    }
+    return rules;
+  }
+
+  /**
+   * Match `re` and return captures.
+   */
+
+  function match(re) {
+    var m = re.exec(css);
+    if (!m) return;
+    var str = m[0];
+    updatePosition(str);
+    css = css.slice(str.length);
+    return m;
+  }
+
+  /**
+   * Parse whitespace.
+   */
+
+  function whitespace() {
+    match(/^\s*/);
+  }
+
+  /**
+   * Parse comments;
+   */
+
+  function comments(rules) {
+    var c;
+    rules = rules || [];
+    while (c = comment()) {
+      if (c !== false) {
+        rules.push(c);
+      }
+    }
+    return rules;
+  }
+
+  /**
+   * Parse comment.
+   */
+
+  function comment() {
+    var pos = position();
+    if ('/' != css.charAt(0) || '*' != css.charAt(1)) return;
+
+    var i = 2;
+    while ("" != css.charAt(i) && ('*' != css.charAt(i) || '/' != css.charAt(i + 1))) ++i;
+    i += 2;
+
+    if ("" === css.charAt(i-1)) {
+      return error('End of comment missing');
+    }
+
+    var str = css.slice(2, i - 2);
+    column += 2;
+    updatePosition(str);
+    css = css.slice(i);
+    column += 2;
+
+    return pos({
+      type: 'comment',
+      comment: str
+    });
+  }
+
+  /**
+   * Parse selector.
+   */
+
+  function selector() {
+    var m = match(/^([^{]+)/);
+    if (!m) return;
+    /* @fix Remove all comments from selectors
+     * http://ostermiller.org/findcomment.html */
+    return trim(m[0])
+      .replace(/\/\*([^*]|[\r\n]|(\*+([^*/]|[\r\n])))*\*\/+/g, '')
+      .replace(/"(?:\\"|[^"])*"|'(?:\\'|[^'])*'/g, function(m) {
+        return m.replace(/,/g, '\u200C');
+      })
+      .split(/\s*(?![^(]*\)),\s*/)
+      .map(function(s) {
+        return s.replace(/\u200C/g, ',');
+      });
+  }
+
+  /**
+   * Parse declaration.
+   */
+
+  function declaration() {
+    var pos = position();
+
+    // prop
+    var prop = match(/^(\*?[-#\/\*\\\w]+(\[[0-9a-z_-]+\])?)\s*/);
+    if (!prop) return;
+    prop = trim(prop[0]);
+
+    // :
+    if (!match(/^:\s*/)) return error("property missing ':'");
+
+    // val
+    var val = match(/^((?:'(?:\\'|.)*?'|"(?:\\"|.)*?"|\([^\)]*?\)|[^};])+)/);
+
+    var ret = pos({
+      type: 'declaration',
+      property: prop.replace(commentre, ''),
+      value: val ? trim(val[0]).replace(commentre, '') : ''
+    });
+
+    // ;
+    match(/^[;\s]*/);
+
+    return ret;
+  }
+
+  /**
+   * Parse declarations.
+   */
+
+  function declarations() {
+    var decls = [];
+
+    if (!open()) return error("missing '{'");
+    comments(decls);
+
+    // declarations
+    var decl;
+    while (decl = declaration()) {
+      if (decl !== false) {
+        decls.push(decl);
+        comments(decls);
+      }
+    }
+
+    if (!close()) return error("missing '}'");
+    return decls;
+  }
+
+  /**
+   * Parse keyframe.
+   */
+
+  function keyframe() {
+    var m;
+    var vals = [];
+    var pos = position();
+
+    while (m = match(/^((\d+\.\d+|\.\d+|\d+)%?|[a-z]+)\s*/)) {
+      vals.push(m[1]);
+      match(/^,\s*/);
+    }
+
+    if (!vals.length) return;
+
+    return pos({
+      type: 'keyframe',
+      values: vals,
+      declarations: declarations()
+    });
+  }
+
+  /**
+   * Parse keyframes.
+   */
+
+  function atkeyframes() {
+    var pos = position();
+    var m = match(/^@([-\w]+)?keyframes\s*/);
+
+    if (!m) return;
+    var vendor = m[1];
+
+    // identifier
+    var m = match(/^([-\w]+)\s*/);
+    if (!m) return error("@keyframes missing name");
+    var name = m[1];
+
+    if (!open()) return error("@keyframes missing '{'");
+
+    var frame;
+    var frames = comments();
+    while (frame = keyframe()) {
+      frames.push(frame);
+      frames = frames.concat(comments());
+    }
+
+    if (!close()) return error("@keyframes missing '}'");
+
+    return pos({
+      type: 'keyframes',
+      name: name,
+      vendor: vendor,
+      keyframes: frames
+    });
+  }
+
+  /**
+   * Parse supports.
+   */
+
+  function atsupports() {
+    var pos = position();
+    var m = match(/^@supports *([^{]+)/);
+
+    if (!m) return;
+    var supports = trim(m[1]);
+
+    if (!open()) return error("@supports missing '{'");
+
+    var style = comments().concat(rules());
+
+    if (!close()) return error("@supports missing '}'");
+
+    return pos({
+      type: 'supports',
+      supports: supports,
+      rules: style
+    });
+  }
+
+  /**
+   * Parse host.
+   */
+
+  function athost() {
+    var pos = position();
+    var m = match(/^@host\s*/);
+
+    if (!m) return;
+
+    if (!open()) return error("@host missing '{'");
+
+    var style = comments().concat(rules());
+
+    if (!close()) return error("@host missing '}'");
+
+    return pos({
+      type: 'host',
+      rules: style
+    });
+  }
+
+  /**
+   * Parse media.
+   */
+
+  function atmedia() {
+    var pos = position();
+    var m = match(/^@media *([^{]+)/);
+
+    if (!m) return;
+    var media = trim(m[1]);
+
+    if (!open()) return error("@media missing '{'");
+
+    var style = comments().concat(rules());
+
+    if (!close()) return error("@media missing '}'");
+
+    return pos({
+      type: 'media',
+      media: media,
+      rules: style
+    });
+  }
+
+
+  /**
+   * Parse custom-media.
+   */
+
+  function atcustommedia() {
+    var pos = position();
+    var m = match(/^@custom-media\s+(--[^\s]+)\s*([^{;]+);/);
+    if (!m) return;
+
+    return pos({
+      type: 'custom-media',
+      name: trim(m[1]),
+      media: trim(m[2])
+    });
+  }
+
+  /**
+   * Parse paged media.
+   */
+
+  function atpage() {
+    var pos = position();
+    var m = match(/^@page */);
+    if (!m) return;
+
+    var sel = selector() || [];
+
+    if (!open()) return error("@page missing '{'");
+    var decls = comments();
+
+    // declarations
+    var decl;
+    while (decl = declaration()) {
+      decls.push(decl);
+      decls = decls.concat(comments());
+    }
+
+    if (!close()) return error("@page missing '}'");
+
+    return pos({
+      type: 'page',
+      selectors: sel,
+      declarations: decls
+    });
+  }
+
+  /**
+   * Parse document.
+   */
+
+  function atdocument() {
+    var pos = position();
+    var m = match(/^@([-\w]+)?document *([^{]+)/);
+    if (!m) return;
+
+    var vendor = trim(m[1]);
+    var doc = trim(m[2]);
+
+    if (!open()) return error("@document missing '{'");
+
+    var style = comments().concat(rules());
+
+    if (!close()) return error("@document missing '}'");
+
+    return pos({
+      type: 'document',
+      document: doc,
+      vendor: vendor,
+      rules: style
+    });
+  }
+
+  /**
+   * Parse font-face.
+   */
+
+  function atfontface() {
+    var pos = position();
+    var m = match(/^@font-face\s*/);
+    if (!m) return;
+
+    if (!open()) return error("@font-face missing '{'");
+    var decls = comments();
+
+    // declarations
+    var decl;
+    while (decl = declaration()) {
+      decls.push(decl);
+      decls = decls.concat(comments());
+    }
+
+    if (!close()) return error("@font-face missing '}'");
+
+    return pos({
+      type: 'font-face',
+      declarations: decls
+    });
+  }
+
+  /**
+   * Parse import
+   */
+
+  var atimport = _compileAtrule('import');
+
+  /**
+   * Parse charset
+   */
+
+  var atcharset = _compileAtrule('charset');
+
+  /**
+   * Parse namespace
+   */
+
+  var atnamespace = _compileAtrule('namespace');
+
+  /**
+   * Parse non-block at-rules
+   */
+
+
+  function _compileAtrule(name) {
+    var re = new RegExp('^@' + name + '\\s*([^;]+);');
+    return function() {
+      var pos = position();
+      var m = match(re);
+      if (!m) return;
+      var ret = { type: name };
+      ret[name] = m[1].trim();
+      return pos(ret);
+    }
+  }
+
+  /**
+   * Parse at rule.
+   */
+
+  function atrule() {
+    if (css[0] != '@') return;
+
+    return atkeyframes()
+      || atmedia()
+      || atcustommedia()
+      || atsupports()
+      || atimport()
+      || atcharset()
+      || atnamespace()
+      || atdocument()
+      || atpage()
+      || athost()
+      || atfontface();
+  }
+
+  /**
+   * Parse rule.
+   */
+
+  function rule() {
+    var pos = position();
+    var sel = selector();
+
+    if (!sel) return error('selector missing');
+    comments();
+
+    return pos({
+      type: 'rule',
+      selectors: sel,
+      declarations: declarations()
+    });
+  }
+
+  return addParent(stylesheet());
+};
+
+'use strict';
+
+window.CSSpec = window.CSSpec || {};
+
+(function($, _) {
+  var mod = CSSpec;
+
+  // constructor
+  // accepts either a document styleSheet object or a CSS string
+  CSSpec.StyleSheet = function(styleObj, onLoad) {
+
+    this.onLoad = onLoad;
+    this.loaded = false;
+    this.testCases = [];
+
+    if (_.isString(styleObj)) { // create inline style tag in <head>
+      this.createStyleTag(styleObj);
+      this.docStyleSheet = _.last(mod.docStyleSheets());
+      this.afterLoad(styleObj);
+    } else if (styleObj.href) {
+      this.docStyleSheet = styleObj;
+      this.loadSource(styleObj.href);
+    }
+
+  };
+
+  mod.StyleSheet.prototype = {
+
+    createStyleTag: function(styleText) {
+      this.$styleTag = $('<style />', { html: styleText }).appendTo('head');
+    },
+
+    removeStyleTag: function() {
+      if (this.$styleTag) this.$styleTag.remove();
+    },
+
+    loadSource: function(url) {
+      $.ajax({ url: url })
+       .done(_.bind(this.afterLoad, this));
+    },
+
+    afterLoad: function(css) {
+      this.source = css;
+      this.prepare();
+      this.loaded = true;
+      if (this.onLoad) this.onLoad();
+    },
+
+    prepare: function() {
+      var rules = mod.parse(this.source).stylesheet.rules;
+      this.createTestCases(rules);
+      this.createFnAttributes(rules);
+    },
+
+    createTestCases: function(rules) {
+      this.testCases = _.chain(rules)
+                        .map(function(rule) {
+                          return _.chain(rule.selectors)
+                                  .filter(mod.hasTestSelector)
+                                  .map(function(selector) {
+                                    return new CSSpec.TestCase(selector, rule);
+                                  }).value()
+                        }).flatten().value();
+    },
+
+    createFnAttributes: function(rules) {
+      this.fnAttributeCollection = new mod.FnAttributeCollection(rules);
+    },
+
+    matchFnAttribute: function($el, attribute) {
+      return this.fnAttributeCollection.matchFnAttribute($el, attribute);
+    },
+
+    execTestCases: function() {
+      _.invoke(this.testCases, 'exec');
+    },
+
+    remove: function() {
+      var i = _.indexOf(mod.styleSheets, this);
+      this.removeStyleTag();
+      if (i > -1) mod.styleSheets.splice(i, 1);
+    }
+
+  };
+
+})(jQuery, _);
+'use strict';
+
+window.CSSpec = window.CSSpec || {};
+
+(function($, _) {
+  var mod = CSSpec;
+
+  // constructor
+  CSSpec.TestCase = function(caseSelector, rule) {
+    this.clauses = mod.splitClauses(caseSelector);
+    this.rule = rule;
+    this.createExpectations(rule.declarations);
+  };
+
+  mod.TestCase.prototype = {
 
     // returns an Expectation object for each CSS name-value pair
-    createExpectations: function(cssStyle) {
+    createExpectations: function(declarations) {
       var testCase = this;
-      return _.map(cssStyle, function(attrName) {
-        return new def.Expectation(testCase, attrName, cssStyle[attrName]);
+      this.expectations = _.map(declarations, function(declaration) {
+        return new mod.Expectation(testCase, declaration.property, declaration.value);
       });
     },
 
@@ -10887,7 +11673,7 @@ window.CSSpec = window.CSSpec || {};
     testTarget: function() {
       return this.revertAfter(function() {
 
-        this.$target = this.applyClauses(def.$fixture);
+        this.$target = this.applyClauses(mod.$fixture);
 
         return this.$target.length === 0 ? 'inapplicable' :
                (this.checkExpectations() ? 'pass' : 'fail');
@@ -10928,7 +11714,7 @@ window.CSSpec = window.CSSpec || {};
 
       if (content) {
 
-        content = content.match(/^\s*(\'(.*)\'|\"(.*)\")\s*$/)[2];
+        content = mod.unquote(content);
         saveContent = $el.html();
         if (content !== saveContent) {
           $el.html(content);
@@ -10938,7 +11724,7 @@ window.CSSpec = window.CSSpec || {};
 
     },
 
-    // needs another refactor to make comprehensible
+    // needs another refactor to make more comprehensible
     applyClauseSelectors: function($input, clause, clauseIndex) {
       var self = this,
           $el = $input,
@@ -10948,9 +11734,9 @@ window.CSSpec = window.CSSpec || {};
           type,
           force = null;
 
-      _.each(def.splitSelectors(clause), function(selector, selectorIndex) {
+      _.each(mod.splitSelectors(clause), function(selector, selectorIndex) {
 
-        type = force || def.selectorType(selector);
+        type = force || mod.selectorType(selector);
         force = null;
 
         switch(type) {
@@ -11021,6 +11807,8 @@ window.CSSpec = window.CSSpec || {};
         case ':not(#':
           this.applyId($el, identifier, true);
           break;
+        default:
+          throw 'CSSpec.TestCase#applySelector: Unsupported Selector Type'
       }
 
     },
@@ -11080,8 +11868,8 @@ window.CSSpec = window.CSSpec || {};
 
       _.each(this.clauses, function(clause) {
 
-        var selectors = def.splitSelectors(clause),
-            types = _.map(selectors, def.selectorType);
+        var selectors = mod.splitSelectors(clause),
+            types = _.map(selectors, mod.selectorType);
 
         _.each(selectors, function(selector, i) {
           if (types[i] === 'selector') {
@@ -11094,7 +11882,7 @@ window.CSSpec = window.CSSpec || {};
               }
             }
           } else {
-            sections.push(def.csspecSelectorToNaturalLanguage(selector, types[i] !== 'stateSelector'));
+            sections.push(mod.scopeToNaturalLanguage(selector, types[i] !== 'stateSelector'));
           }
 
         });
@@ -11113,40 +11901,55 @@ window.CSSpec = window.CSSpec || {};
 
 (function($, _) {
 
-  var def = CSSpec;
+  var mod = CSSpec;
 
   // On DOM ready, do it all
   $(function() {
-    def.run();
+    mod.run();
   });
 
-  _.extend(def, {
+  _.extend(mod, {
 
     fixtureSelector: '#csspec-fixture',
 
-    // prepare, execute and report on all test cases
-    // execution is conditional on the existence of a 
-    // test fixture, since no actual tests can be run
-    // without an instantiated target element
+    styleSheets: [],
+
+    // Prepare, execute and report on all test cases. Execution
+    // is conditional on the existence of the test fixture.
     run: function() {
-      def.$fixture = $(def.fixtureSelector);
-      if (def.$fixture.length > 0) {
-        def.prepare();
-        def.execTestCases();
-        def.report();
+      mod.$fixture = $(mod.fixtureSelector);
+      if (mod.$fixture.length > 0) {
+        mod.prepare(function() {
+          mod.execAllTestCases();
+          mod.report();
+        });
       }
     },
 
     // read all stylesheets and extract tests that 
     // contain test cases (i.e. '.-it-' clauses)
-    prepare: function() {
-      def.testCases = _.chain(def.styleSheets())
-                       .pluck('cssRules')
-                       .map(_.toArray)
-                       .flatten()
-                       .map(def.ruleTestCases)
-                       .flatten()
-                       .value();
+    prepare: function(complete) {
+      _.each(this.docStyleSheets(), function(docStyleSheet) {
+        mod.appendStyleSheet(docStyleSheet, function() {
+          if (_.every(_.pluck(mod.styleSheets, 'prepared'), _.identity)) complete();          
+        });
+      });
+      if (mod.styleSheets.length === 0) complete();
+    },
+
+    appendStyleSheet: function(styleObj, complete) {
+      var styleSheet = new mod.StyleSheet(styleObj, complete);
+      mod.styleSheets.push(styleSheet);
+      return styleSheet;
+    },
+
+    execAllTestCases: function() {
+      _.invoke(this.styleSheets, 'execTestCases');
+    },
+
+    // for test stubbing
+    docStyleSheets: function() {
+      return document.styleSheets;
     },
 
     // override earlier test criteria with later
@@ -11155,13 +11958,9 @@ window.CSSpec = window.CSSpec || {};
 
     },
 
-    execTestCases: function() {
-      _.invoke(def.testCases, 'exec');
-    },
-
     report: function() {
 
-      var results   = _.pluck(def.testCases, 'result'),
+      var results   = _.pluck(mod.testCases, 'result'),
           counts    = { pass: 0, fail: 0, pending: 0, inapplicable: 0 },
           dotReport = _.map(results, function(result) {
                         switch(result) {
@@ -11183,15 +11982,10 @@ window.CSSpec = window.CSSpec || {};
                   counts.pending      + ' PENDING');
       console.log('');
 
-      _.chain(def.testCases)
+      _.chain(mod.testCases)
        .filter(function(testCase) { return testCase.result === 'fail'; })
        .invoke('report');
 
-    },
-
-    // primarily to permit test stubbing
-    styleSheets: function() {
-      return document.styleSheets;
     },
 
     selectorType: function(selector) {
@@ -11214,8 +12008,8 @@ window.CSSpec = window.CSSpec || {};
       return clause.match(/(\:not\()?[.#:]*[^.#:]+\)?/g);
     },
 
-    csspecSelectorToNaturalLanguage: function(csspecClass, omitType) {
-      if (def.selectorType(csspecClass) === 'selector') return null;
+    scopeToNaturalLanguage: function(csspecClass, omitType) {
+      if (mod.selectorType(csspecClass) === 'selector') return null;
       return _.rest(csspecClass.split('-'), omitType ? 2 : 1).join(' ').trim();
     },
 
@@ -11228,11 +12022,85 @@ window.CSSpec = window.CSSpec || {};
       throw "Nested Requirement";
     },
 
-    ruleTestCases: function(cssRule) {
-      return _.chain(cssRule.selectorText.split(/,\s*/))
-              .filter(def.hasTestSelector)
-              .map(function(selector) { return new def.TestCase(selector, cssRule); })
-              .value();
+    isFnAttribute: function(attribute, value) {
+      return /function\s*\(/.test(value);
+    },
+
+    unwrapFunction: function(string) {
+      return string ? eval( '(' + mod.unquote(string) + ')' ) : null;
+    },
+
+    unquote: function(quotedString) {
+      var m = quotedString.match(/^\s*(\'(.*)\'|\"(.*)\")\s*$/);
+      return (m[2] || m[3]).replace(/\\\"/g, '"').replace(/\\\'/g, "'");
+    },
+
+    elementAttributeFunction: function($el, attribute) {
+      var fnAttr = _.chain(this.styleSheets)
+                    .invoke('matchFnAttribute', $el, attribute)
+                    .compact()
+                    .reduce(function(memo, fnAttribute) {
+                      return fnAttribute.specificity >= memo.specificity ? fnAttribute : memo;
+                    })
+                    .value();
+      return fnAttr ? fnAttr.fn : null;
+    },
+
+    parseSelector: function(selector, $el) {
+      var m, negative, typeIdentifier, type, token, closeParen, result;
+      m = selector.match(/^(\:not\()?(\*|\.|#|\:|\:\:)?([\w\-]+)?(\))?$/);
+      if (!m) throw 'CSSpec.parseSelector: Invalid Selector';
+
+      negative = m[1];
+      typeIdentifier = m[2];
+      type = mod.selectorTypeFromTypeIdentifier(typeIdentifier || '');
+      token = m[3];
+      closeParen = m[4];
+
+      if (!typeIdentifier && !token)     throw 'CSSpec.parseSelector: Empty Selector';
+      if (negative && !closeParen)       throw 'CSSpec.parseSelector: Missing ) in Negative Selector';
+      if (type === 'universal' && token) throw 'CSSpec.parseSelector: Invalid Character Following * Selector';
+
+      result = { type: type };
+      if (token)    result.token = token;
+      if (negative) result.negative = true;
+      return result;
+    },
+
+    selectorTypeFromTypeIdentifier: function(typeIdentifier) {
+      switch (typeIdentifier) {
+        case '*'  : return 'universal';
+        case ''   : return 'element';
+        case '::' : return 'psuedoElement';
+        case '.'  : return 'class';
+        case ':'  : return 'psuedoClass';
+        case '#'  : return 'id';
+      }
+      throw  'CSSpec.selectorTypeFromTypeIdentifier: Invalid Identifier Type';
+    },
+
+    // No way (I think) for it to have a selector and also be inline, 
+    // so perhaps those should collapse to one argument.
+    // Pass true rather than a string to represent inline? Or an object?
+    selectorSpecificity: function(compoundSelector, inline, important) {
+
+      var types = compoundSelector ?
+                  _.chain(mod.splitClauses(compoundSelector))
+                   .map(mod.splitSelectors)
+                   .flatten()
+                   .map(mod.parseSelector)
+                   .countBy('type')
+                   .value()
+                  : {};
+
+      return (types.element       || 0)              +
+             (types.psuedoElement || 0)              +
+             (types.class         || 0) * 256        +
+             (types.psuedoClass   || 0) * 256        +
+             (types.id            || 0) * 256 * 256  +
+             (inline    ? 256 * 256 * 256       : 0) +
+             (important ? 256 * 256 * 256 * 256 : 0);
+
     }
 
   });

@@ -4,40 +4,55 @@ window.CSSpec = window.CSSpec || {};
 
 (function($, _) {
 
-  var def = CSSpec;
+  var mod = CSSpec;
 
   // On DOM ready, do it all
   $(function() {
-    def.run();
+    mod.run();
   });
 
-  _.extend(def, {
+  _.extend(mod, {
 
     fixtureSelector: '#csspec-fixture',
 
-    // prepare, execute and report on all test cases
-    // execution is conditional on the existence of a 
-    // test fixture, since no actual tests can be run
-    // without an instantiated target element
+    styleSheets: [],
+
+    // Prepare, execute and report on all test cases. Execution
+    // is conditional on the existence of the test fixture.
     run: function() {
-      def.$fixture = $(def.fixtureSelector);
-      if (def.$fixture.length > 0) {
-        def.prepare();
-        def.execTestCases();
-        def.report();
+      mod.$fixture = $(mod.fixtureSelector);
+      if (mod.$fixture.length > 0) {
+        mod.prepare(function() {
+          mod.execAllTestCases();
+          mod.report();
+        });
       }
     },
 
     // read all stylesheets and extract tests that 
     // contain test cases (i.e. '.-it-' clauses)
-    prepare: function() {
-      def.testCases = _.chain(def.styleSheets())
-                       .pluck('cssRules')
-                       .map(_.toArray)
-                       .flatten()
-                       .map(def.ruleTestCases)
-                       .flatten()
-                       .value();
+    prepare: function(complete) {
+      _.each(this.docStyleSheets(), function(docStyleSheet) {
+        mod.appendStyleSheet(docStyleSheet, function() {
+          if (_.every(_.pluck(mod.styleSheets, 'prepared'), _.identity)) complete();          
+        });
+      });
+      if (mod.styleSheets.length === 0) complete();
+    },
+
+    appendStyleSheet: function(styleObj, complete) {
+      var styleSheet = new mod.StyleSheet(styleObj, complete);
+      mod.styleSheets.push(styleSheet);
+      return styleSheet;
+    },
+
+    execAllTestCases: function() {
+      _.invoke(this.styleSheets, 'execTestCases');
+    },
+
+    // for test stubbing
+    docStyleSheets: function() {
+      return document.styleSheets;
     },
 
     // override earlier test criteria with later
@@ -46,13 +61,9 @@ window.CSSpec = window.CSSpec || {};
 
     },
 
-    execTestCases: function() {
-      _.invoke(def.testCases, 'exec');
-    },
-
     report: function() {
 
-      var results   = _.pluck(def.testCases, 'result'),
+      var results   = _.pluck(mod.testCases, 'result'),
           counts    = { pass: 0, fail: 0, pending: 0, inapplicable: 0 },
           dotReport = _.map(results, function(result) {
                         switch(result) {
@@ -74,15 +85,10 @@ window.CSSpec = window.CSSpec || {};
                   counts.pending      + ' PENDING');
       console.log('');
 
-      _.chain(def.testCases)
+      _.chain(mod.testCases)
        .filter(function(testCase) { return testCase.result === 'fail'; })
        .invoke('report');
 
-    },
-
-    // primarily to permit test stubbing
-    styleSheets: function() {
-      return document.styleSheets;
     },
 
     selectorType: function(selector) {
@@ -105,8 +111,8 @@ window.CSSpec = window.CSSpec || {};
       return clause.match(/(\:not\()?[.#:]*[^.#:]+\)?/g);
     },
 
-    csspecSelectorToNaturalLanguage: function(csspecClass, omitType) {
-      if (def.selectorType(csspecClass) === 'selector') return null;
+    scopeToNaturalLanguage: function(csspecClass, omitType) {
+      if (mod.selectorType(csspecClass) === 'selector') return null;
       return _.rest(csspecClass.split('-'), omitType ? 2 : 1).join(' ').trim();
     },
 
@@ -119,11 +125,85 @@ window.CSSpec = window.CSSpec || {};
       throw "Nested Requirement";
     },
 
-    ruleTestCases: function(cssRule) {
-      return _.chain(cssRule.selectorText.split(/,\s*/))
-              .filter(def.hasTestSelector)
-              .map(function(selector) { return new def.TestCase(selector, cssRule); })
-              .value();
+    isFnAttribute: function(attribute, value) {
+      return /function\s*\(/.test(value);
+    },
+
+    unwrapFunction: function(string) {
+      return string ? eval( '(' + mod.unquote(string) + ')' ) : null;
+    },
+
+    unquote: function(quotedString) {
+      var m = quotedString.match(/^\s*(\'(.*)\'|\"(.*)\")\s*$/);
+      return (m[2] || m[3]).replace(/\\\"/g, '"').replace(/\\\'/g, "'");
+    },
+
+    elementAttributeFunction: function($el, attribute) {
+      var fnAttr = _.chain(this.styleSheets)
+                    .invoke('matchFnAttribute', $el, attribute)
+                    .compact()
+                    .reduce(function(memo, fnAttribute) {
+                      return fnAttribute.specificity >= memo.specificity ? fnAttribute : memo;
+                    })
+                    .value();
+      return fnAttr ? fnAttr.fn : null;
+    },
+
+    parseSelector: function(selector, $el) {
+      var m, negative, typeIdentifier, type, token, closeParen, result;
+      m = selector.match(/^(\:not\()?(\*|\.|#|\:|\:\:)?([\w\-]+)?(\))?$/);
+      if (!m) throw 'CSSpec.parseSelector: Invalid Selector';
+
+      negative = m[1];
+      typeIdentifier = m[2];
+      type = mod.selectorTypeFromTypeIdentifier(typeIdentifier || '');
+      token = m[3];
+      closeParen = m[4];
+
+      if (!typeIdentifier && !token)     throw 'CSSpec.parseSelector: Empty Selector';
+      if (negative && !closeParen)       throw 'CSSpec.parseSelector: Missing ) in Negative Selector';
+      if (type === 'universal' && token) throw 'CSSpec.parseSelector: Invalid Character Following * Selector';
+
+      result = { type: type };
+      if (token)    result.token = token;
+      if (negative) result.negative = true;
+      return result;
+    },
+
+    selectorTypeFromTypeIdentifier: function(typeIdentifier) {
+      switch (typeIdentifier) {
+        case '*'  : return 'universal';
+        case ''   : return 'element';
+        case '::' : return 'psuedoElement';
+        case '.'  : return 'class';
+        case ':'  : return 'psuedoClass';
+        case '#'  : return 'id';
+      }
+      throw  'CSSpec.selectorTypeFromTypeIdentifier: Invalid Identifier Type';
+    },
+
+    // No way (I think) for it to have a selector and also be inline, 
+    // so perhaps those should collapse to one argument.
+    // Pass true rather than a string to represent inline? Or an object?
+    selectorSpecificity: function(compoundSelector, inline, important) {
+
+      var types = compoundSelector ?
+                  _.chain(mod.splitClauses(compoundSelector))
+                   .map(mod.splitSelectors)
+                   .flatten()
+                   .map(mod.parseSelector)
+                   .countBy('type')
+                   .value()
+                  : {};
+
+      return (types.element       || 0)              +
+             (types.psuedoElement || 0)              +
+             (types.class         || 0) * 256        +
+             (types.psuedoClass   || 0) * 256        +
+             (types.id            || 0) * 256 * 256  +
+             (inline    ? 256 * 256 * 256       : 0) +
+             (important ? 256 * 256 * 256 * 256 : 0);
+
     }
 
   });

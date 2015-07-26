@@ -1,15 +1,27 @@
 'use strict';
 
-describe('test case', function(){
+describe('expectation', function(){
+  var mod = CSSpec;
 
   var instance = function(testCase, attribute, expected) {
-    return new CSSpec.Expectation(
-                  testCase  || new CSSpec.TestCase('.some-class', { selectorText: ('.some-class'), style: [] }), 
+    return new mod.Expectation(
+                  testCase  || new mod.TestCase('.some-class', { selectorText: ('.some-class'), style: [] }), 
                   attribute || 'attribute',
                   expected  || 'expected'
                );
   }
 
+  describe('::new', function() {
+    it('should initialize properties', function() {
+      var testCase = new mod.TestCase('.class', { selectors: ['.class'], declarations: [] }),
+          attribute = 'test-attribute',
+          expected = 'expected value',
+          expectation = instance(testCase, attribute, expected);
+      expect(expectation.testCase).toBe(testCase);
+      expect(expectation.attribute).toEqual(attribute);
+      expect(expectation.expected).toEqual(expected);
+    });
+  });
   describe('#test', function() {
     var expectation = instance(null, null, 'expected value');
     it('should resolve the expected expression', function() {
@@ -76,6 +88,17 @@ describe('test case', function(){
     });
   });
 
+  describe('#customAttribute', function() {
+    var expectation = instance();
+    it('should evalute a custom attribute function defined directly the test element selector', function() {
+      var styleSheet = mod.appendStyleSheet(".target { custom-attr: \"function() { return 12345 }\" }"),
+          $el = $('<div />', { class: 'target' }).appendTo('body');
+      expect(expectation.customAttribute($el, 'custom-attr')).toEqual(12345);
+      styleSheet.remove();
+      $el.remove();
+    });
+  });
+
   describe('#resolveExpression', function() {
     var expectation = instance(),
         $el = $('<div />', {
@@ -132,7 +155,7 @@ describe('test case', function(){
       });
     });
     describe('a caret selector', function() {
-      it('alone should find all selector parents');
+      xit('alone should find all selector parents');
       it('should find a preceeding selector', function() {
         $el = $('<div id="a"><div id="b"><div id="c"></div></div></div>').appendTo('body');
         expect(selectorsToIds('#a #c', '^#a')).toEqual(['a']);
@@ -145,13 +168,13 @@ describe('test case', function(){
         $el = $('<div id="a"><div id="b"><div id="c"></div></div></div>').appendTo('body');
         expect(selectorsToIds('#a div div', '^#a')).toEqual(['a']);
       });
-      it('should find a preceeding compound selector');
-      it('should find a preceeding immediate descendent compound selector');
-      it('should find a preceeding adjacent sibling compound selector');
-      it('should find a preceeding general sibling compound selector');
-      it('should find a cousin decendent of a selector parent');
-      it('should find <body> and <html>');
-      it('should find a cousin decendent of body');
+      xit('should find a preceeding compound selector');
+      xit('should find a preceeding immediate descendant compound selector');
+      xit('should find a preceeding adjacent sibling compound selector');
+      xit('should find a preceeding general sibling compound selector');
+      xit('should find a cousin decendent of a selector parent');
+      xit('should find <body> and <html>');
+      xit('should find a cousin decendent of body');
     });
     describe('an ampersand', function() {
       it('should reference the current element', function() {
@@ -228,9 +251,13 @@ describe('test case', function(){
           $el = $('<div><div id="a"></div><div id="b"></div><div id="c"></div></div>').appendTo('body');
           expect(selectorsToIds('div ~ #c', '&&div')).toEqual(['b', 'a']);
         });
-        it('should only find selector preceeding general siblings that match qualifications', function() {
+        it('should only find selectors preceeding general siblings that match qualifications', function() {
           $el = $('<div><div id="a" class="x"></div><div id="b"></div><div id="c"></div></div>').appendTo('body');
           expect(selectorsToIds('div ~ #c', '&&.x')).toEqual(['a']);
+        });
+        it('should only match elements that are in the target element\'s actual hierarchy', function() {
+          $el = $('<div id="a"><div id="b"></div><div id="c"></div></div>').appendTo('body');
+          expect(selectorsToIds('div #b', '&&div')).toEqual(['a']);
         });
       });
       describe('with cousin descendents', function() {
@@ -244,10 +271,10 @@ describe('test case', function(){
           $el = $('<div id="a"><div id="b"><div id="c"></div></div></div>').appendTo('body');
           expect(selectorsToIds('#a div #c', '&&&')).toEqual(['a']);
         });
-        it('should find a parent with additional selection filtering');
-        it('should find the parent of a selector immediate descendant');
-        it('should find the selector preceeding adjacent sibling');
-        it('should find the selector preceeding general siblings');
+        xit('should find a parent with additional selection filtering');
+        xit('should find the parent of a selector immediate descendant');
+        xit('should find the selector preceeding adjacent sibling');
+        xit('should find the selector preceeding general siblings');
       });
     });
   });

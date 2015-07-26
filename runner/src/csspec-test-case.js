@@ -3,22 +3,22 @@
 window.CSSpec = window.CSSpec || {};
 
 (function($, _) {
-  var def = CSSpec;
+  var mod = CSSpec;
 
   // constructor
-  CSSpec.TestCase = function(ruleSelector, cssRule) {
-    this.clauses = def.splitClauses(ruleSelector);
-    this.cssRule = cssRule;
-    this.expectations = this.createExpectations(cssRule.style);
+  CSSpec.TestCase = function(caseSelector, rule) {
+    this.clauses = mod.splitClauses(caseSelector);
+    this.rule = rule;
+    this.createExpectations(rule.declarations);
   };
 
-  def.TestCase.prototype = {
+  mod.TestCase.prototype = {
 
     // returns an Expectation object for each CSS name-value pair
-    createExpectations: function(cssStyle) {
+    createExpectations: function(declarations) {
       var testCase = this;
-      return _.map(cssStyle, function(attrName) {
-        return new def.Expectation(testCase, attrName, cssStyle[attrName]);
+      this.expectations = _.map(declarations, function(declaration) {
+        return new mod.Expectation(testCase, declaration.property, declaration.value);
       });
     },
 
@@ -32,7 +32,7 @@ window.CSSpec = window.CSSpec || {};
     testTarget: function() {
       return this.revertAfter(function() {
 
-        this.$target = this.applyClauses(def.$fixture);
+        this.$target = this.applyClauses(mod.$fixture);
 
         return this.$target.length === 0 ? 'inapplicable' :
                (this.checkExpectations() ? 'pass' : 'fail');
@@ -73,7 +73,7 @@ window.CSSpec = window.CSSpec || {};
 
       if (content) {
 
-        content = content.match(/^\s*(\'(.*)\'|\"(.*)\")\s*$/)[2];
+        content = mod.unquote(content);
         saveContent = $el.html();
         if (content !== saveContent) {
           $el.html(content);
@@ -83,7 +83,7 @@ window.CSSpec = window.CSSpec || {};
 
     },
 
-    // needs another refactor to make comprehensible
+    // needs another refactor to make more comprehensible
     applyClauseSelectors: function($input, clause, clauseIndex) {
       var self = this,
           $el = $input,
@@ -93,9 +93,9 @@ window.CSSpec = window.CSSpec || {};
           type,
           force = null;
 
-      _.each(def.splitSelectors(clause), function(selector, selectorIndex) {
+      _.each(mod.splitSelectors(clause), function(selector, selectorIndex) {
 
-        type = force || def.selectorType(selector);
+        type = force || mod.selectorType(selector);
         force = null;
 
         switch(type) {
@@ -166,6 +166,8 @@ window.CSSpec = window.CSSpec || {};
         case ':not(#':
           this.applyId($el, identifier, true);
           break;
+        default:
+          throw 'CSSpec.TestCase#applySelector: Unsupported Selector Type'
       }
 
     },
@@ -225,8 +227,8 @@ window.CSSpec = window.CSSpec || {};
 
       _.each(this.clauses, function(clause) {
 
-        var selectors = def.splitSelectors(clause),
-            types = _.map(selectors, def.selectorType);
+        var selectors = mod.splitSelectors(clause),
+            types = _.map(selectors, mod.selectorType);
 
         _.each(selectors, function(selector, i) {
           if (types[i] === 'selector') {
@@ -239,7 +241,7 @@ window.CSSpec = window.CSSpec || {};
               }
             }
           } else {
-            sections.push(def.csspecSelectorToNaturalLanguage(selector, types[i] !== 'stateSelector'));
+            sections.push(mod.scopeToNaturalLanguage(selector, types[i] !== 'stateSelector'));
           }
 
         });
