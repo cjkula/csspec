@@ -16,7 +16,7 @@ describe('FnAttributeCollection', function(){
 
   describe('#createFnAttributes', function() {
     it('should populate FnAttributes from stylesheet rules', function() {
-      var css = ".some-class { custom-attr: \"function() { return 321; }\" }",
+      var css = ".some-class { -fn-custom-attr: \"return 321;\" }",
           collection = instance(),
           rules = mod.parse(css).stylesheet.rules,
           fnAttr;
@@ -54,13 +54,28 @@ describe('FnAttributeCollection', function(){
         $outer = $('<div id="A" class="outer"><div id="B" class="inner"></div></div>').appendTo('body'),
         $inner = $outer.find('.inner');
     function addFn(fn, selector, attribute) { 
-      coll.appendFnAttribute(attribute || 'custom-attr', fn, selector);
+      return coll.appendFnAttribute(attribute || 'custom-attr', fn, selector);
     }
     beforeEach(function() {
       coll = new mod.FnAttributeCollection();
     });
     afterAll(function() {
       $fixture.remove();
+    });
+    it('should call #matchElement on each attribute-matching fnAttribute', function() {
+      var fnAttr1 = addFn(fn1, '.inner'),
+          fnAttr2 = addFn(fn2, '.outer'),
+          fnAttr3 = addFn(fn3, '.other');
+      spyOn(fnAttr1, 'matchElement').and.returnValue(false);
+      spyOn(fnAttr2, 'matchElement').and.returnValue(false);
+      spyOn(fnAttr3, 'matchElement').and.returnValue(false);
+      coll.matchFnAttribute($outer, 'custom-attr');
+      expect(fnAttr1.matchElement).toHaveBeenCalledWith($outer);
+      expect(fnAttr2.matchElement).toHaveBeenCalledWith($outer);
+      expect(fnAttr3.matchElement).toHaveBeenCalledWith($outer);
+    });
+    it('should not call #matchElement on non-attribute-matching fnAttributes', function() {
+      
     });
     it('should return a function with a selector matching the passed element', function() {
       addFn(fn1, '.outer');
@@ -91,13 +106,19 @@ describe('FnAttributeCollection', function(){
         expect(coll.matchFnAttribute($inner, 'custom-attr').fn).toBe(fn3);
       });      
     });
-    describe('when no selector matches the element', function() {
-      it('should return null', function() {
+    describe('when a containing element matches the selector', function() {
+      it('should return the containing selector', function() {
         addFn(fn1, '.outer');
-        expect(coll.matchFnAttribute($inner, 'custom-attr')).toBe(null);
+        expect(coll.matchFnAttribute($inner, 'custom-attr').selector).toBe('.outer');
       });
     });
-    describe('when match for the attribute is found', function() {
+    describe('when no selector matches the element', function() {
+      it('should return null', function() {
+        addFn(fn1, '.other');
+        expect(coll.matchFnAttribute($outer, 'custom-attr')).toBe(null);
+      });      
+    });
+    describe('when no match for the attribute is found', function() {
       it('should return null', function() {
         addFn(fn1, '.outer');
         expect(coll.matchFnAttribute($outer, 'another-attr')).toBe(null);

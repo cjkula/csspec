@@ -10778,7 +10778,8 @@ window.CSSpec = window.CSSpec || {};
       var actual = this.resolveAttribute(this.testCase.$target, this.attribute),
           expected = this.resolveExpression(this.testCase.$target, this.expected);
 
-      if (actual === expected) return true;
+      // note judicious use of double equal sign to permit duck-type comparison.
+      if (actual == expected) return true;
       this.error = 'expected :' + this.attribute + ' to be ' + expected +' but was ' + actual + '.';
       return false;
     },
@@ -10792,13 +10793,13 @@ window.CSSpec = window.CSSpec || {};
     },
 
     customAttribute: function($el, attribute) {
-      var fn = mod.elementAttributeFunction($el, attribute);
-      return fn ? fn.call($el[0], $el, attribute, this) : null;
+      var fnAttr = mod.elementFnAttribute($el, attribute);
+      return fnAttr ? fnAttr.evaluate($el, this) : null;
     },
 
     resolveExpression: function($el, expression) { 
       var re = /\(?(([.#:]*[^.#:)]+\s*)*)\)?\[([^\]]+)\]/g;
-      return expression.replace(re, _.bind(function(m, selectors, _, attribute) {
+      return mod.unquote(expression).replace(re, _.bind(function(m, selectors, _, attribute) {
         var $target = selectors ? this.resolveRelativeElement(selectors, $el): $el;
         return this.resolveAttribute($target, attribute);
       }, this));
@@ -10879,13 +10880,14 @@ window.CSSpec = window.CSSpec || {};
 
     createFnAttributes: function(rules) {
       var self = this,
-          fnAttributes = {};
+          fnAttributes = {},
+          attribute;
       _.each(rules, function(rule) {
         _.each(rule.declarations, function(declaration) {
-          if (mod.isFnAttribute(declaration.property, declaration.value)) {
+          attribute = mod.matchAttributeName(declaration.property);
+          if (attribute) {
             _.each(rule.selectors, function(selector) {
-              var fn = mod.unwrapFunction(declaration.value);
-              self.appendFnAttribute(declaration.property, fn, selector);          
+              self.appendFnAttribute(attribute, mod.unquote(declaration.value), selector);
             });
           }
         });
@@ -10901,7 +10903,7 @@ window.CSSpec = window.CSSpec || {};
 
     matchFnAttribute: function($el, attribute) {
       var fnAttrs = _.filter(this.fnAttributes[attribute] || [], function(fnAttr) {
-                      return attribute === fnAttr.attribute && $el.is(fnAttr.selector);
+                      return fnAttr.matchElement($el);
                     });
 
       if (fnAttrs.length === 0) return null;
@@ -10909,7 +10911,6 @@ window.CSSpec = window.CSSpec || {};
       return _.reduce(fnAttrs, function(memo, fnAttr) {
         return fnAttr.specificity >= memo.specificity ? fnAttr : memo;
       });
-
     }
 
   };
@@ -10923,16 +10924,28 @@ window.CSSpec = window.CSSpec || {};
   var mod = CSSpec;
 
   // constructor
-  CSSpec.FnAttribute = function(attribute, fn, selector, inline, important) {
+  CSSpec.FnAttribute = function(attribute, fnOrText, selector, inline, important) {
     this.attribute = attribute;
+    this.fn = (typeof fnOrText === 'function') ? fnOrText : this.createFunction(fnOrText);
     this.selector = selector;
-    this.fn = fn;
     this.specificity = mod.selectorSpecificity(selector, inline, important);
   };
 
-  // mod.FnAttribute.prototype = {
-    
-  // };
+  mod.FnAttribute.prototype = {
+
+    createFunction: function(text) {
+      return new Function('$el', 'attribute', 'expectation', '$', '_', text);
+    },
+
+    matchElement: function($el) {
+      return ($el.is(this.selector + ' *') || $el.is(this.selector));
+    },
+
+    evaluate: function($el, expectation) {
+      return this.fn.call($el[0], $el, this.attribute, expectation, jQuery, _);
+    }
+
+  };
 
 })(jQuery, _);
 'use strict';
@@ -11938,7 +11951,7 @@ window.CSSpec = window.CSSpec || {};
     prepare: function(complete) {
       _.each(this.docStyleSheets(), function(docStyleSheet) {
         mod.appendStyleSheet(docStyleSheet, function() {
-          if (_.every(_.pluck(mod.styleSheets, 'prepared'), _.identity)) complete();          
+          if (_.every(_.pluck(mod.styleSheets, 'loaded'), _.identity)) complete();          
         });
       });
       if (mod.styleSheets.length === 0) complete();
@@ -11966,8 +11979,8 @@ window.CSSpec = window.CSSpec || {};
     },
 
     report: function() {
-
-      var results   = _.pluck(mod.testCases, 'result'),
+      var testCases = _.flatten(_.pluck(mod.styleSheets, 'testCases'));
+          results   =  _.pluck(testCases,'result'),
           counts    = { pass: 0, fail: 0, pending: 0, inapplicable: 0 },
           dotReport = _.map(results, function(result) {
                         switch(result) {
@@ -11989,7 +12002,7 @@ window.CSSpec = window.CSSpec || {};
                   counts.pending      + ' PENDING');
       console.log('');
 
-      _.chain(mod.testCases)
+      _.chain(testCases)
        .filter(function(testCase) { return testCase.result === 'fail'; })
        .invoke('report');
 
@@ -12029,28 +12042,24 @@ window.CSSpec = window.CSSpec || {};
       throw "Nested Requirement";
     },
 
-    isFnAttribute: function(attribute, value) {
-      return /function\s*\(/.test(value);
-    },
-
-    unwrapFunction: function(string) {
-      return string ? eval( '(' + mod.unquote(string) + ')' ) : null;
+    matchAttributeName: function(cssAttribute) {
+      return (cssAttribute.match(/^\-fn\-(.*)$/) || [])[1];
     },
 
     unquote: function(quotedString) {
       var m = quotedString.match(/^\s*(\'(.*)\'|\"(.*)\")\s*$/);
+      if (!m) return quotedString;
       return (m[2] || m[3]).replace(/\\\"/g, '"').replace(/\\\'/g, "'");
     },
 
-    elementAttributeFunction: function($el, attribute) {
-      var fnAttr = _.chain(this.styleSheets)
-                    .invoke('matchFnAttribute', $el, attribute)
-                    .compact()
-                    .reduce(function(memo, fnAttribute) {
-                      return fnAttribute.specificity >= memo.specificity ? fnAttribute : memo;
-                    })
-                    .value();
-      return fnAttr ? fnAttr.fn : null;
+    elementFnAttribute: function($el, attribute) {
+      return _.chain(this.styleSheets)
+              .invoke('matchFnAttribute', $el, attribute)
+              .compact()
+              .reduce(function(memo, fnAttribute) {
+                return fnAttribute.specificity >= memo.specificity ? fnAttribute : memo;
+              })
+              .value();
     },
 
     parseSelector: function(selector, $el) {

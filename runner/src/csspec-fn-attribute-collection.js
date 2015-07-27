@@ -15,13 +15,14 @@ window.CSSpec = window.CSSpec || {};
 
     createFnAttributes: function(rules) {
       var self = this,
-          fnAttributes = {};
+          fnAttributes = {},
+          attribute;
       _.each(rules, function(rule) {
         _.each(rule.declarations, function(declaration) {
-          if (mod.isFnAttribute(declaration.property, declaration.value)) {
+          attribute = mod.matchAttributeName(declaration.property);
+          if (attribute) {
             _.each(rule.selectors, function(selector) {
-              var fn = mod.unwrapFunction(declaration.value);
-              self.appendFnAttribute(declaration.property, fn, selector);          
+              self.appendFnAttribute(attribute, mod.unquote(declaration.value), selector);
             });
           }
         });
@@ -37,7 +38,7 @@ window.CSSpec = window.CSSpec || {};
 
     matchFnAttribute: function($el, attribute) {
       var fnAttrs = _.filter(this.fnAttributes[attribute] || [], function(fnAttr) {
-                      return attribute === fnAttr.attribute && $el.is(fnAttr.selector);
+                      return fnAttr.matchElement($el);
                     });
 
       if (fnAttrs.length === 0) return null;
@@ -45,7 +46,6 @@ window.CSSpec = window.CSSpec || {};
       return _.reduce(fnAttrs, function(memo, fnAttr) {
         return fnAttr.specificity >= memo.specificity ? fnAttr : memo;
       });
-
     }
 
   };

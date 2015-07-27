@@ -62,6 +62,8 @@ This compiles to:
 
 The resulting two tests, "my feature by default should not be displayed" and "my feature when activated should be displayed", are tested comparing the actual DOM element properties to the expectations defined inside each -it- clause.
 
+### Testing Against Attributes and Elements
+
 Right-hand expressions inside of -it- blocks can evaluate other attributes of the target element, its children, its selector parents, or cousins (which provides access to the full document).
 
     describe my nested boxes
@@ -84,9 +86,37 @@ Right-hand expressions inside of -it- blocks can evaluate other attributes of th
 * ^^ is similar to ^ but skips the immediate selector parent. ^^^ skips past the grandparent, etc.
 * ^* represents all selector parents.
 
+### Custom Attributes
 
-Obviously dancing around issues of comparison and calculation for the time being. :)
+Use the -> operator in CSSpec to declare a JavaScript function which will evaluate like a regular element attribute. Custom attributes can be used as the attribute name, i.e. before the colon, or in the right-hand expression using the above bracket notation [], and can therefore also refer to custom attributes on other elements using the above selectors.
 
+    describe element comparison
+      content =
+        .first-el
+        .second-el
+      offset-top -> return $el.offset().top
+      .first-el + .second-el
+        it should be vertically top-aligned with the previous element
+          offset-top: "^[offset-top]"
+
+In SASS/CSS, function attributes are namespaced with the -fn- prefix. The above -> declaration parses to the following SASS:
+
+    -fn-offset-top: "return $el.offset().top"
+
+The snippet has access to:
+
+* this: the DOM element (as in jQuery)
+* $el: the jQuery-wrapped element
+* attribute: the name of the custom attribute being called (to allow for future wildcard attributes)
+* expectation: the internal oject running the test, enabling access to much of the CSSpec internal context
+* $: the jQuery object
+* _: the Underscore object
+
+Note that the above interface is in flux, and will probably be wrapped up differently once CoffeeScript is integrated (v.0.4.0).
+
+### Calculation
+
+Soon to come.
 
 Vision
 ------

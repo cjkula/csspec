@@ -18,7 +18,8 @@ window.CSSpec = window.CSSpec || {};
       var actual = this.resolveAttribute(this.testCase.$target, this.attribute),
           expected = this.resolveExpression(this.testCase.$target, this.expected);
 
-      if (actual === expected) return true;
+      // note judicious use of double equal sign to permit duck-type comparison.
+      if (actual == expected) return true;
       this.error = 'expected :' + this.attribute + ' to be ' + expected +' but was ' + actual + '.';
       return false;
     },
@@ -32,13 +33,13 @@ window.CSSpec = window.CSSpec || {};
     },
 
     customAttribute: function($el, attribute) {
-      var fn = mod.elementAttributeFunction($el, attribute);
-      return fn ? fn.call($el[0], $el, attribute, this) : null;
+      var fnAttr = mod.elementFnAttribute($el, attribute);
+      return fnAttr ? fnAttr.evaluate($el, this) : null;
     },
 
     resolveExpression: function($el, expression) { 
       var re = /\(?(([.#:]*[^.#:)]+\s*)*)\)?\[([^\]]+)\]/g;
-      return expression.replace(re, _.bind(function(m, selectors, _, attribute) {
+      return mod.unquote(expression).replace(re, _.bind(function(m, selectors, _, attribute) {
         var $target = selectors ? this.resolveRelativeElement(selectors, $el): $el;
         return this.resolveAttribute($target, attribute);
       }, this));

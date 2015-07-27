@@ -90,18 +90,26 @@ describe('expectation', function(){
 
   describe('#customAttribute', function() {
     var expectation = instance();
-    it('should evalute a custom attribute function defined directly the test element selector', function() {
-      var styleSheet = mod.appendStyleSheet(".target { custom-attr: \"function() { return 12345 }\" }"),
-          $el = $('<div />', { class: 'target' }).appendTo('body');
-      expect(expectation.customAttribute($el, 'custom-attr')).toEqual(12345);
-      styleSheet.remove();
-      $el.remove();
-    });
-    xit('it should use new Function()');
-    xit('it should provide access to the DOM element');
-    xit('it should provide access to the jQuery-wrapped element');
-    xit('it should provide access to the attribute name');
-    xit('it should provide access to the Expectation object');
+    xit('should query for the fnAttribute matching the attribute and $el');
+    xit('should evaluate the function and return the result if there is a matching fnAttribute');
+    xit('should pass a reference to itself (the Expectation)');
+    xit('should return null if there is no matching fnAttribute');
+
+    // these tests are now being covered in fnAttribute spec
+    // xit('should evalute a custom attribute function defined directly on the test element selector', function() {
+    //   var styleSheet = mod.appendStyleSheet(".target { -fn-custom-attr: \"return 12345\" }"),
+    //       $el = $('<div />', { class: 'target' }).appendTo('body');
+    //   expect(expectation.customAttribute($el, 'custom-attr')).toEqual(12345);
+    //   styleSheet.remove();
+    //   $el.remove();
+    // });
+    // xit('should evalute a custom attribute function defined on a parent of the test element selector', function() {
+    //   var styleSheet = mod.appendStyleSheet(".parent { -fn-custom-attr: \"return 54321\" }"),
+    //       $el = $('<div class="parent"><div class="target"></div></div>').appendTo('body');
+    //   expect(expectation.customAttribute($el.find('.target'), 'custom-attr')).toEqual(54321);
+    //   styleSheet.remove();
+    //   $el.remove();
+    // });
   });
 
   describe('#resolveExpression', function() {
@@ -177,8 +185,8 @@ describe('expectation', function(){
         expect(selectorsToIds('div div div', '^*div')).toEqual(['b', 'a']);
       });
       xit('should find a preceeding compound selector', function() {
-        // each element needs to be qualified as being in the parent tree
-        // or the selection will encompass children as well
+        // each element needs to be individually qualified as being in the
+        // parent tree or the selection would encompass children/cousins.
         $el = $('<div id="a"><div id="b"><div id="c"></div></div></div>').appendTo('body');
         expect(selectorsToIds('#a #b #c', '^*div ^*div')).toEqual(['b']);
       });
