@@ -302,6 +302,10 @@ describe('CSSpec', function(){
     it('should parse a psuedo-element', function() {
       expect(mod.parseSelector('::before')).toEqual({ type: 'psuedoElement', token: 'before' });
     });
+    it('should parse a legacy psuedo-element', function() {
+      expect(mod.parseSelector(':before')).toEqual({ type: 'psuedoElement', token: 'before' });
+      expect(mod.parseSelector(':after')).toEqual({ type: 'psuedoElement', token: 'after' });
+    });
     it('should parse a negative psuedo-element', function() {
       expect(mod.parseSelector(':not(::before)')).toEqual({ type: 'psuedoElement', token: 'before', negative: true });
     });

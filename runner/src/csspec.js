@@ -159,6 +159,7 @@ window.CSSpec = window.CSSpec || {};
       type = mod.selectorTypeFromTypeIdentifier(typeIdentifier || '');
       token = m[3];
       closeParen = m[4];
+      if (typeIdentifier === ':' && (token === 'before' || token === 'after')) type = 'psuedoElement';
 
       if (!typeIdentifier && !token)     throw 'CSSpec.parseSelector: Empty Selector';
       if (negative && !closeParen)       throw 'CSSpec.parseSelector: Missing ) in Negative Selector';
