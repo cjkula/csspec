@@ -224,8 +224,7 @@ describe('CSSpec', function(){
   });
 
   // name change and now returns the fnAttr
-  // was describe('elementAttributeFunction', function() {
-  xdescribe('elementFnAttribute', function() {
+  describe('elementFnAttribute', function() {
     var $el = $('<div />'),
         attribute = 'custom-attr';
     describe('when there are stylesheets', function() {
@@ -240,7 +239,7 @@ describe('CSSpec', function(){
       });
       it('should call each stylesheet for matches', function() {
         spyOn(mod.StyleSheet.prototype, 'matchFnAttribute').and.returnValue({});
-        mod.elementAttributeFunction($el, attribute);
+        mod.elementFnAttribute($el, attribute);
         expect(mod.StyleSheet.prototype.matchFnAttribute.calls.count()).toEqual(2);
         expect(mod.StyleSheet.prototype.matchFnAttribute).toHaveBeenCalledWith($el, attribute);
       });
@@ -248,7 +247,7 @@ describe('CSSpec', function(){
         it('should return the matched function', function() {
           var fn = function() {0};
           spyOn(mod.StyleSheet.prototype, 'matchFnAttribute').and.returnValue({fn: fn});
-          expect(mod.elementAttributeFunction($el, attribute)).toBe(fn);
+          expect(mod.elementFnAttribute($el, attribute)).toEqual({fn: fn});
         });
       });
       describe('when results have equal specificity', function() {
@@ -257,7 +256,7 @@ describe('CSSpec', function(){
           spyOn(mod.StyleSheet.prototype, 'matchFnAttribute').and.callFake(function() {
             return { fn: (count++ ? fn2 : fn1), specificity: 10 };
           });
-          expect(mod.elementAttributeFunction($el, attribute)).toBe(fn2);
+          expect(mod.elementFnAttribute($el, attribute)).toEqual({ fn: fn2, specificity: 10 });
         });
       });
       describe('when results have unequal specificity', function() {
@@ -266,21 +265,21 @@ describe('CSSpec', function(){
           spyOn(mod.StyleSheet.prototype, 'matchFnAttribute').and.callFake(function() {
             return count++ ? { fn: fn1, specificity: 100 } : { fn: fn2, specificity: 10 };
           });
-          expect(mod.elementAttributeFunction($el, attribute)).toBe(fn1);
+          expect(mod.elementFnAttribute($el, attribute)).toEqual({ fn: fn1, specificity: 100 });
         });
       });
       describe('when a function attribute does not match the element', function() {
         it('should return null', function() {
           var fn = function() {0};
           spyOn(mod.StyleSheet.prototype, 'matchFnAttribute').and.returnValue(null);
-          expect(mod.elementAttributeFunction($el, 'no-match')).toBe(null);
+          expect(mod.elementFnAttribute($el, 'no-match')).toBe(null);
         });
       });
     });
     describe('when there are no stylesheets', function() {
       it('should return null', function() {
         mod.styleSheets = [];
-        expect(mod.elementAttributeFunction($el, attribute)).toBe(null);
+        expect(mod.elementFnAttribute($el, attribute)).toBe(null);
       });
     });
   });

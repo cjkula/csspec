@@ -12059,7 +12059,7 @@ window.CSSpec = window.CSSpec || {};
               .reduce(function(memo, fnAttribute) {
                 return fnAttribute.specificity >= memo.specificity ? fnAttribute : memo;
               })
-              .value();
+              .value() || null;
     },
 
     parseSelector: function(selector, $el) {
