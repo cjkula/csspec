@@ -100,6 +100,14 @@ describe('#preprocessLine', function() {
     preprocessLine("\twhen go -> .go-cls // comment").should.equal("\t&.-when-go-.go-cls // comment");
   });
   it('works around scope declaration trailing comment issue'); // SASS errors when a scope line ending with a comment is followed by a property declaration
+  describe('inline custom attribute JavaScript', function() {
+    it('converts Javascript follow a -> to a string', function() {
+      preprocessLine("\tcustom-attr -> return '#fff'").should.equal("\t-fn-custom-attr: \"return '#fff'\"");
+    });
+    it('escapes double quotes', function() {
+      preprocessLine('black -> return "#000"').should.equal('-fn-black: "return \\"#000\\""');
+    });
+  });
 });
 
 describe('hamljs', function() {

@@ -65,13 +65,21 @@ function extractHAML(lines) {
   return haml;
 }
 
+function processJS(content) {
+  var m = content.match(/^(\s*)([\w\-]+)\s*\-\>\s*(.*)$/i);
+  return m ? (m[1] + '-fn-' + m[2] + ': "' + m[3].replace(/"/g, '\\"') + '"') : null;
+}
+
 // process single (non-HAML) line
 function preprocessLine(line) {
-  var m, content, comment, prefix, description, pair, selectors, addSelectors = '';
+  var m, content, comment, js, prefix, description, pair, selectors, addSelectors = '';
 
   m = line.match(/^(.*[^\s\/])(\s*\/\/.*)$/i);
   content = m ? m[1] : line;
   comment = m ? m[2] : '';
+
+  js = processJS(content);
+  if (js) return js + comment;
 
   m = content.match(/^(\s*)(describe|when|it)\b(.*)$/i);
   if (!m) return line;
