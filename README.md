@@ -70,22 +70,23 @@ Right-hand expressions inside of -it- blocks can evaluate other attributes of th
           it should be square
             height: [width]
           it should inherit text color
-            color: &&[color]
+            color: ^[color]
           it should correspond in text alignment of its first child
-            text-align: :first-child[text-align]
+            text-align: ::first-child[text-align]
           it should match the dimensions of its siblings
-            height: (&& > *)[height]
-            width: (&& > *)[width]
+            height: (^ > *)[height]
+            width: (^ > *)[width]
           it should have the same font as the document
             font: ^body[font]
 
+* Without a ^ operator the selector is applied on or within the current element. & is the self operator: essentially the same as above, so not needed except to clarify syntax or to qualify the current element in order to skip undesired test cases (probably not the best practice -- better to qualify the case from its CSSpec context).
+* ^ gets the closest _selector_ parent (not DOM parent) which matches the rest of the selector.
+* ^^ is similar to ^ but skips the immediate selector parent. ^^^ skips past the grandparent, etc.
+* ^* represents all selector parents.
+
+
 Obviously dancing around issues of comparison and calculation for the time being. :)
 
-* & is the self operator: the same as no selector, so generally not required.
-* && is the immediate selector parent (not DOM parent).
-* &&& is the grandparent, etc.
-* ^ represents the full selector parent hierarchy.
-* If not qualified with the above operators, the selector is applied within the current element. 
 
 Vision
 ------

@@ -97,6 +97,11 @@ describe('expectation', function(){
       styleSheet.remove();
       $el.remove();
     });
+    xit('it should use new Function()');
+    xit('it should provide access to the DOM element');
+    xit('it should provide access to the jQuery-wrapped element');
+    xit('it should provide access to the attribute name');
+    xit('it should provide access to the Expectation object');
   });
 
   describe('#resolveExpression', function() {
@@ -154,25 +159,36 @@ describe('expectation', function(){
         expect(selectorsToIds('#a', '#b >div')).toEqual(['c']);
       });
     });
-    describe('a caret selector', function() {
-      xit('alone should find all selector parents');
-      it('should find a preceeding selector', function() {
+    describe('a caret-star selector', function() {
+      xit('should find all selector parents', function() {
         $el = $('<div id="a"><div id="b"><div id="c"></div></div></div>').appendTo('body');
-        expect(selectorsToIds('#a #c', '^#a')).toEqual(['a']);
+        expect(selectorsToIds('#a #b #c', '^*')).toEqual(['b', 'a']);
       });
-      it('should find multiple matches of a preceeding selector', function() {
+      it('should find an immediately preceeding parent', function() {
         $el = $('<div id="a"><div id="b"><div id="c"></div></div></div>').appendTo('body');
-        expect(selectorsToIds('div div div', '^div')).toEqual(['b', 'a']);
+        expect(selectorsToIds('#a #c', '^*#a')).toEqual(['a']);
       });
-      it('should find a twice preceeding selector', function() {
+      it('should find a subset of selector parents', function() {
         $el = $('<div id="a"><div id="b"><div id="c"></div></div></div>').appendTo('body');
-        expect(selectorsToIds('#a div div', '^#a')).toEqual(['a']);
+        expect(selectorsToIds('#a div div', '^*#a')).toEqual(['a']);
       });
-      xit('should find a preceeding compound selector');
+      it('should find multiple matches on selector parents', function() {
+        $el = $('<div id="a"><div id="b"><div id="c"></div></div></div>').appendTo('body');
+        expect(selectorsToIds('div div div', '^*div')).toEqual(['b', 'a']);
+      });
+      xit('should find a preceeding compound selector', function() {
+        // each element needs to be qualified as being in the parent tree
+        // or the selection will encompass children as well
+        $el = $('<div id="a"><div id="b"><div id="c"></div></div></div>').appendTo('body');
+        expect(selectorsToIds('#a #b #c', '^*div ^*div')).toEqual(['b']);
+      });
       xit('should find a preceeding immediate descendant compound selector');
       xit('should find a preceeding adjacent sibling compound selector');
       xit('should find a preceeding general sibling compound selector');
-      xit('should find a cousin decendent of a selector parent');
+      it('should find decendents of a selector parent', function() {
+        $el = $('<div id="a"><div id="b"></div><div id="c"></div></div>').appendTo('body');
+        expect(selectorsToIds('#a #b', '^*div div')).toEqual(['b', 'c']);
+      });
       xit('should find <body> and <html>');
       xit('should find a cousin decendent of body');
     });
@@ -197,81 +213,80 @@ describe('expectation', function(){
         });
       });
     });
-    describe('a double ampersand', function() {
-      it('should find a parent selector element', function() {
+    describe('a caret', function() {
+      it('should find the parent selector element', function() {
         $el = $('<div id="a"><div id="b"><div id="c"></div></div></div>').appendTo('body');
-        expect(selectorsToIds('#a #c', '&&')).toEqual(['a']);
-      });
-      it('should find multiple parent selector elements', function() {
-        $el = $('<div id="a"><div id="b"><div id="c"></div></div></div>').appendTo('body');
-        expect(selectorsToIds('div #c', '&&')).toEqual(['b', 'a']);
+        expect(selectorsToIds('#a #c', '^')).toEqual(['a']);
       });
       it('should find the parent of a selector immediate descendant', function() {
         $el = $('<div id="a"><div id="b"><div id="c"></div></div></div>').appendTo('body');
-        expect(selectorsToIds('div > #c', '&&')).toEqual(['b']);
+        expect(selectorsToIds('div > #c', '^')).toEqual(['b']);
       });
       it('should find the selector preceeding adjacent sibling', function() {
         $el = $('<div id="a"></div><div id="b"></div><div id="c"></div>').appendTo('body');
-        expect(selectorsToIds('div + #c', '&&')).toEqual(['b']);
+        expect(selectorsToIds('div + #c', '^')).toEqual(['b']);
       });
       it('should find the selector preceeding general siblings', function() {
         $el = $('<div><div id="a"></div><div id="b"></div><div id="c"></div></div>').appendTo('body');
-        expect(selectorsToIds('div ~ #c', '&&')).toEqual(['b', 'a']);
+        expect(selectorsToIds('div ~ #c', '^')).toEqual(['b']);
       });
       describe('qualified by additional selectors', function() {
         it('should find a parent selector element', function() {
           $el = $('<div id="a"><div id="b"><div id="c"></div></div></div>').appendTo('body');
-          expect(selectorsToIds('div #c', '&&#a')).toEqual(['a']);
+          expect(selectorsToIds('div #c', '^#a')).toEqual(['a']);
         });
-        it('should find multiple parent selector elements', function() {
+        it('should not find multiple parent selector elements', function() {
           $el = $('<div id="a" class="x"><div id="b" class="x"><div id="c"></div></div></div>').appendTo('body');
-          expect(selectorsToIds('div #c', '&&.x')).toEqual(['b', 'a']);
+          expect(selectorsToIds('div #c', '^.x')).toEqual(['b']);
         });
         it('should find no parent selector elements', function() {
           $el = $('<div id="a"><div id="b"><div id="c"></div></div></div>').appendTo('body');
-          expect(selectorsToIds('div #c', '&&#c')).toEqual([]);
+          expect(selectorsToIds('div #c', '^#c')).toEqual([]);
         });
         it('should find the parent of a selector immediate descendant', function() {
           $el = $('<div id="a"><div id="b"><div id="c"></div></div></div>').appendTo('body');
-          expect(selectorsToIds('div > #c', '&&#b')).toEqual(['b']);
+          expect(selectorsToIds('div > #c', '^#b')).toEqual(['b']);
         });
         it('should not find the parent of a selector immediate descendant if fails qualifications', function() {
           $el = $('<div id="a"><div id="b"><div id="c"></div></div></div>').appendTo('body');
-          expect(selectorsToIds('div > #c', '&&#a')).toEqual([]);
+          expect(selectorsToIds('div > #c', '^#a')).toEqual([]);
         });
         it('should find the selector preceeding adjacent sibling', function() {
           $el = $('<div id="a"></div><div id="b"></div><div id="c"></div>').appendTo('body');
-          expect(selectorsToIds('div + #c', '&&div#b')).toEqual(['b']);
+          expect(selectorsToIds('div + #c', '^div#b')).toEqual(['b']);
         });
         it('should find the selector preceeding adjacent sibling if fails qualifications', function() {
           $el = $('<div id="a"></div><div id="b"></div><div id="c"></div>').appendTo('body');
-          expect(selectorsToIds('div + #c', '&&#a')).toEqual([]);
+          expect(selectorsToIds('div + #c', '^#a')).toEqual([]);
         });
         it('should find the selector preceeding general siblings', function() {
           $el = $('<div><div id="a"></div><div id="b"></div><div id="c"></div></div>').appendTo('body');
-          expect(selectorsToIds('div ~ #c', '&&div')).toEqual(['b', 'a']);
+          expect(selectorsToIds('div ~ #c', '^div')).toEqual(['b']);
         });
         it('should only find selectors preceeding general siblings that match qualifications', function() {
           $el = $('<div><div id="a" class="x"></div><div id="b"></div><div id="c"></div></div>').appendTo('body');
-          expect(selectorsToIds('div ~ #c', '&&.x')).toEqual(['a']);
+          expect(selectorsToIds('div ~ #c', '^.x')).toEqual(['a']);
         });
         it('should only match elements that are in the target element\'s actual hierarchy', function() {
           $el = $('<div id="a"><div id="b"></div><div id="c"></div></div>').appendTo('body');
-          expect(selectorsToIds('div #b', '&&div')).toEqual(['a']);
+          expect(selectorsToIds('div #b', '^div')).toEqual(['a']);
         });
       });
       describe('with cousin descendents', function() {
         it('should find a cousin by class', function() {
           $el = $('<div id="a"><div id="b"><div id="c"></div></div><div id="d" class="cousin"></div></div>').appendTo('body');
-          expect(selectorsToIds('#a #c', '&& .cousin')).toEqual(['d']);
+          expect(selectorsToIds('#a #c', '^ .cousin')).toEqual(['d']);
         });
       });
-      describe('multiple ampersands', function() {
-        it('should find the next parent selector elements', function() {
+      describe('multiple carets', function() {
+        it('should find higher parent selector elements', function() {
           $el = $('<div id="a"><div id="b"><div id="c"></div></div></div>').appendTo('body');
-          expect(selectorsToIds('#a div #c', '&&&')).toEqual(['a']);
+          expect(selectorsToIds('#a div #c', '^^')).toEqual(['a']);
         });
-        xit('should find a parent with additional selection filtering');
+        it('should find a grandparent with additional selection filtering', function() {
+          $el = $('<div id="a"><div id="b"><div id="c"><div id="d"></div></div></div></div>').appendTo('body');
+          expect(selectorsToIds('#a div #d', '^^#a')).toEqual(['a']);
+        });
         xit('should find the parent of a selector immediate descendant');
         xit('should find the selector preceeding adjacent sibling');
         xit('should find the selector preceeding general siblings');

@@ -26,9 +26,9 @@ window.CSSpec = window.CSSpec || {};
     resolveAttribute: function($el, attrName) {
       var el = $el[0];
       return this.customAttribute($el, attrName)
-        || $el.css(attrName) 
-        || (el.currentStyle && el.currentStyle[attrName]) 
-        || window.getComputedStyle(el)[attrName];
+          || $el.css(attrName)
+          || (el.currentStyle && el.currentStyle[attrName])
+          || window.getComputedStyle(el)[attrName];
     },
 
     customAttribute: function($el, attribute) {
@@ -46,30 +46,25 @@ window.CSSpec = window.CSSpec || {};
 
     resolveRelativeElement: function(relativeSelector, $current) {
       var clauses = mod.splitClauses($current.selector),
-          m = relativeSelector.match(/(\^)?(&+)?(\S*)(\s+(.+))?/),
-          caret = m[1],
-          ampersandCount = (m[2] || '').length,
-          selector = m[3],
-          childSelectors = m[4],
+          m = relativeSelector.match(/((\^+)(\*)?|(&))?(\S+)?(\s+(.+))?/),
+          caretCount = (m[2] || '').length,
+          star = m[3],
+          ampersand = m[4],
+          selector = m[5],
+          childSelectors = m[7],
+          single = false,
           initialClauses,
           $ret;
 
-      if(caret) {
-        $ret = $current.parents();
+      if (star) { // implied ^* (or ^^* etc.)
 
-      } else if (ampersandCount === 0) {
+        // SHOULD be all _selector_ parents; added carets would skip closest parents
+        $ret = $current.parents(); // DOM parents, i.e. not yet accounting for +, ~ operators
 
-        $ret = $current;
-        childSelectors = ((selector || '') + ' ' + (childSelectors || '')).trim();
-        selector = null;
+      } else if (caretCount > 0) {
 
-      } else if (ampersandCount === 1) {
-
-        $ret = $current;
-
-      } else {
-
-        initialClauses = _.initial(clauses, ampersandCount - 1).join(' ');
+        single = true;
+        initialClauses = _.initial(clauses, caretCount).join(' ');
 
         switch(_.last(clauses).charAt(0)) {
           case '>': // trace back to immediate ancestor
@@ -84,10 +79,22 @@ window.CSSpec = window.CSSpec || {};
           default:  // check all ancestors
             $ret = $current.parents(initialClauses);
         }
+
+      } else { // selecting on/within $current
+
+        $ret = $current;
+
+        if (!ampersand) {
+          // first selector, if any, is actually the beginning of child selectors
+          childSelectors = ((selector || '') + ' ' + (childSelectors || '')).trim();
+          selector = null;
+        }
+
       }
 
       if (selector) $ret = $ret.filter(selector);
       if (childSelectors) $ret = $ret.find(childSelectors);
+      if (single) $ret = $ret.eq(0);
 
       return $ret;
     }
