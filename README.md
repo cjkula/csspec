@@ -147,7 +147,7 @@ More significantly, this pattern offers a level of abstraction for selectors of 
 Who Tests the Testers?
 ----------------------
 
-Compiler tests: `npm run compiler-test`
+Compiler tests: `make compiler-test`
 
 Browser test-runner tests: `npm test`
 

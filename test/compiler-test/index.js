@@ -51,7 +51,7 @@ describe('#preprocess', function() {
       preprocess(".item\n\t$img =\n\t\t%img").should
           .equal(".item\n\t$img : '<img/>'");
     });
-    it('ports trailing comments into SASS');
+    xit('ports trailing comments into SASS');
   });
 });
 
@@ -99,7 +99,7 @@ describe('#preprocessLine', function() {
     preprocessLine("\twhen .stop ///").should.equal("\t&.-when-.stop ///");
     preprocessLine("\twhen go -> .go-cls // comment").should.equal("\t&.-when-go-.go-cls // comment");
   });
-  it('works around scope declaration trailing comment issue'); // SASS errors when a scope line ending with a comment is followed by a property declaration
+  xit('works around scope declaration trailing comment issue'); // SASS errors when a scope line ending with a comment is followed by a property declaration
   describe('inline custom attribute JavaScript', function() {
     it('converts Javascript follow a -> to a string', function() {
       preprocessLine("\tcustom-attr -> return '#fff'").should.equal("\t-fn-custom-attr: \"return '#fff'\"");
@@ -108,12 +108,38 @@ describe('#preprocessLine', function() {
       preprocessLine('black -> return "#000"').should.equal('-fn-black: "return \\"#000\\""');
     });
   });
+  describe('expectations with expressions', function() {
+    it('recognizes atrribute - colon - expression', function() {
+      preprocessLine('el-attr: [margin-top]').should.equal('el-attr: "[margin-top]"');
+      preprocessLine('el-attr: ^^[margin-top]').should.equal('el-attr: "^^[margin-top]"');
+    });
+    it('should unwrap unneccessarily-wrapped lefthand attributes', function() {
+      preprocessLine('[el-attr]: [margin-top]').should.equal('el-attr: "[margin-top]"');
+      preprocessLine('[el-attr] : [margin-top]').should.equal('el-attr : "[margin-top]"');
+      preprocessLine('&[el-attr]: [margin-top]').should.equal('el-attr: "[margin-top]"');
+    });
+    it('recognizes comparison expressions', function() {
+      preprocessLine('[margin-bottom] > [margin-top]').should.equal('-expect: "[margin-bottom] > [margin-top]"');
+      preprocessLine('[margin-bottom] < [margin-top]').should.equal('-expect: "[margin-bottom] < [margin-top]"');
+      preprocessLine('[margin-bottom] >= [margin-top]').should.equal('-expect: "[margin-bottom] >= [margin-top]"');
+      preprocessLine('[margin-bottom] <= [margin-top]').should.equal('-expect: "[margin-bottom] <= [margin-top]"');
+      preprocessLine('[margin-bottom] == [margin-top]').should.equal('-expect: "[margin-bottom] == [margin-top]"');
+      preprocessLine('[margin-bottom] != [margin-top]').should.equal('-expect: "[margin-bottom] != [margin-top]"');
+    });
+    it('recognizes expressions with operators on the right side of expression', function() {
+      preprocessLine('margin-bottom: 10px + 20px').should.equal('margin-bottom: "10px + 20px"');
+      preprocessLine('margin-bottom: 20px - 10px').should.equal('margin-bottom: "20px - 10px"');
+      preprocessLine('margin-bottom: 10px * 2').should.equal('margin-bottom: "10px * 2"');
+      preprocessLine('margin-bottom: 10px / 2').should.equal('margin-bottom: "10px / 2"');
+    });
+    xit('recognizes expressions with deceptive quotes');
+  })
 });
 
 describe('hamljs', function() {
   it('should compile HAML', function() {
-    HAML.render('%td.cell#excellent1 hello').trim().should
-        .equal('<td id="excellent1" class="cell">hello</td>');
+    HAML.render('%td.cell#excellent1 hello').trim()
+        .should.equal('<td id="excellent1" class="cell">hello</td>');
   });
 });
 

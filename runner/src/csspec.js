@@ -86,7 +86,7 @@ window.CSSpec = window.CSSpec || {};
       console.log('');
 
       _.chain(testCases)
-       .filter(function(testCase) { return testCase.result === 'fail'; })
+       .filter(function(testCase) { return testCase.result === 'fail' })
        .invoke('report');
 
     },

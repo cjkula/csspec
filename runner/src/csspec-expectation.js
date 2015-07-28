@@ -20,7 +20,9 @@ window.CSSpec = window.CSSpec || {};
 
       // note judicious use of double equal sign to permit duck-type comparison.
       if (actual == expected) return true;
-      this.error = 'expected :' + this.attribute + ' to be ' + expected +' but was ' + actual + '.';
+
+      // test fails
+      this.error = 'expected [' + this.attribute + '] to be ' + expected +' but was ' + actual + '.';
       return false;
     },
 

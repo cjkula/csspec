@@ -70,19 +70,46 @@ function processJS(content) {
   return m ? (m[1] + '-fn-' + m[2] + ': "' + m[3].replace(/"/g, '\\"') + '"') : null;
 }
 
-// process single (non-HAML) line
-function preprocessLine(line) {
-  var m, content, comment, js, prefix, description, pair, selectors, addSelectors = '';
+function processExpectation(content) {
+  var m = content.match(/^(\s*)((\&?\[?[\w\-]+\]?)(\s*)(\:|\>|\<|\>\=|\<\=|\=\=|\!\=)(\s*)(.*))$/i),
+          s1, s2, s3, attribute, operator, expression, simpleAttr;
+console.log(m && 'MATCHED')
+  if (!m) return null;
 
-  m = line.match(/^(.*[^\s\/])(\s*\/\/.*)$/i);
-  content = m ? m[1] : line;
-  comment = m ? m[2] : '';
+  s1 = m[1];
+  fullExpression = m[2];
+  attribute = m[3];
+  s2 = m[4];
+  operator = m[5];
+  s3 = m[6];
+  expected = m[7];
+// console.log(s1.length, attribute, s2.length, operator, s3.length, expected, fullExpression)
+  simpleAttr = attribute.match(/^\&?(\[([\w\-]+)\]|([\w\-]+))$/);
+// console.log('simple:' , simpleAttr)
+  if (!simpleAttr || operator != ':') {
+    return s1 + '-expect: ' + doubleQuote(fullExpression);
+  } else if (isExpression(expected)) {
+    return s1 + (simpleAttr[2] || simpleAttr[3]) + s2 + ':' + s3 + doubleQuote(expected);
+  } else {
+    return null;
+  }
 
-  js = processJS(content);
-  if (js) return js + comment;
+}
+
+function doubleQuote(string) {
+  return '"' + string.replace(/\"/, '\\"').replace(/\\/, '\\\\') + '"';
+}
+
+// simplified good-enough test: just look for an [attr] declaration.
+function isExpression(text) {
+  return /(\[[\w\-]+\]|\+|\-|\*|\/)/.test(text);
+}
+
+function processScope(content) {
+  var m, prefix, description, pair, selectors, addSelectors = '';
 
   m = content.match(/^(\s*)(describe|when|it)\b(.*)$/i);
-  if (!m) return line;
+  if (!m) return null;
 
   indent = m[1];
   prefix = m[2].toLowerCase();
@@ -100,7 +127,22 @@ function preprocessLine(line) {
     addSelectors = selectors.join('.-when-');
   }
 
-  return indent + scopeClass(prefix, description, !!indent) + addSelectors + comment;
+  return indent + scopeClass(prefix, description, !!indent) + addSelectors;
+}
+
+// process single (non-HAML) line
+function preprocessLine(line) {
+  var m, content, comment, js, prefix, description, pair, selectors, addSelectors = '';
+
+  // separate out trailing spaces and comments
+  m = line.match(/^(.*[^\s\/])(\s*\/\/.*)$/i);
+  content = m ? m[1] : line;
+  comment = m ? m[2] : '';
+
+  return ( processJS(content) 
+            || processExpectation(content)
+            || processScope(content)       
+                || content) + comment;
 }
 
 // check for -> syntax and return array [firstObj, secondObj]
