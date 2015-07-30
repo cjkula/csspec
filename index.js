@@ -73,7 +73,6 @@ function processJS(content) {
 function processExpectation(content) {
   var m = content.match(/^(\s*)((\&?\[?[\w\-]+\]?)(\s*)(\:|\>|\<|\>\=|\<\=|\=\=|\!\=)(\s*)(.*))$/i),
           s1, s2, s3, attribute, operator, expression, simpleAttr;
-console.log(m && 'MATCHED')
   if (!m) return null;
 
   s1 = m[1];
@@ -83,9 +82,7 @@ console.log(m && 'MATCHED')
   operator = m[5];
   s3 = m[6];
   expected = m[7];
-// console.log(s1.length, attribute, s2.length, operator, s3.length, expected, fullExpression)
   simpleAttr = attribute.match(/^\&?(\[([\w\-]+)\]|([\w\-]+))$/);
-// console.log('simple:' , simpleAttr)
   if (!simpleAttr || operator != ':') {
     return s1 + '-expect: ' + doubleQuote(fullExpression);
   } else if (isExpression(expected)) {
